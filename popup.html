@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlipRadar</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #ffffff;
+      width: 380px;
+      min-height: 400px;
+      max-height: 550px;
+      overflow-y: auto;
+    }
+
+    .header {
+      background: #16213e;
+      padding: 16px;
+      border-bottom: 1px solid #2d2d44;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: #4ade80;
+    }
+
+    .tier-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #374151;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .tier-badge.flipper {
+      background: #1e40af;
+      color: #93c5fd;
+    }
+
+    .tier-badge.pro {
+      background: #7c3aed;
+      color: #c4b5fd;
+    }
+
+    .tagline {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .user-section {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #2d2d44;
+    }
+
+    .user-email {
+      font-size: 12px;
+      color: #888;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .logout-btn {
+      background: #374151;
+      color: #9ca3af;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .logout-btn:hover {
+      background: #4b5563;
+      color: #fff;
+    }
+
+    .login-section {
+      text-align: center;
+      padding: 20px 16px;
+      background: #16213e;
+      margin: 16px;
+      border-radius: 8px;
+    }
+
+    .login-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .login-desc {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 16px;
+    }
+
+    .login-btn {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .login-btn:hover {
+      background: #2563eb;
+    }
+
+    .stats {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .stat {
+      background: #1a1a2e;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-align: center;
+      flex: 1;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #4ade80;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .usage-bar-container {
+      margin-top: 12px;
+      background: #1a1a2e;
+      padding: 8px 12px;
+      border-radius: 6px;
+    }
+
+    .usage-label {
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .usage-bar {
+      height: 6px;
+      background: #374151;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .usage-fill {
+      height: 100%;
+      background: #4ade80;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .usage-fill.warning {
+      background: #fbbf24;
+    }
+
+    .usage-fill.danger {
+      background: #f87171;
+    }
+
+    .content {
+      padding: 16px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .clear-btn {
+      background: #7f1d1d;
+      color: #fca5a5;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .clear-btn:hover {
+      background: #991b1b;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      background: #16213e;
+      padding: 4px;
+      border-radius: 6px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: transparent;
+      color: #888;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .tab.active {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .tab:hover:not(.active) {
+      background: #2d2d44;
+      color: #fff;
+    }
+
+    .deals-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .deal-card {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 12px;
+      border: 1px solid #2d2d44;
+    }
+
+    .deal-card.synced {
+      border-left: 3px solid #4ade80;
+    }
+
+    .deal-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #fff;
+      margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .deal-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .deal-price {
+      font-size: 16px;
+      font-weight: 700;
+      color: #4ade80;
+    }
+
+    .deal-date {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .deal-profit {
+      font-size: 11px;
+      color: #4ade80;
+      margin-bottom: 8px;
+    }
+
+    .deal-profit.negative {
+      color: #f87171;
+    }
+
+    .deal-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .deal-btn {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+
+    .deal-btn-fb {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .deal-btn-fb:hover {
+      background: #2563eb;
+    }
+
+    .deal-btn-ebay {
+      background: #374151;
+      color: #fff;
+    }
+
+    .deal-btn-ebay:hover {
+      background: #4b5563;
+    }
+
+    .deal-btn-delete {
+      background: none;
+      border: 1px solid #4b5563;
+      color: #888;
+      flex: 0;
+      padding: 6px 10px;
+    }
+
+    .deal-btn-delete:hover {
+      background: #7f1d1d;
+      border-color: #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .empty-text {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .empty-hint {
+      font-size: 12px;
+      color: #555;
+    }
+
+    .footer {
+      padding: 12px 16px;
+      border-top: 1px solid #2d2d44;
+      text-align: center;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .footer-link {
+      color: #4ade80;
+      text-decoration: none;
+      font-size: 12px;
+    }
+
+    .footer-link:hover {
+      text-decoration: underline;
+    }
+
+    .footer-text {
+      font-size: 11px;
+      color: #555;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: #888;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #374151;
+      border-top-color: #4ade80;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .upgrade-banner {
+      background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+      margin: 16px;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .upgrade-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .upgrade-desc {
+      font-size: 11px;
+      color: #c4b5fd;
+      margin-bottom: 12px;
+    }
+
+    .upgrade-btn {
+      background: #fff;
+      color: #1e40af;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .upgrade-btn:hover {
+      background: #f3f4f6;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-top">
+      <span class="logo">FlipRadar</span>
+      <span class="tier-badge" id="tier-badge">Free</span>
+    </div>
+    <div class="tagline">Find profitable flips on FB Marketplace</div>
+
+    <!-- Logged in user section (hidden by default) -->
+    <div class="user-section" id="user-section" style="display: none;">
+      <span class="user-email" id="user-email"></span>
+      <button class="logout-btn" id="logout-btn">Logout</button>
+    </div>
+
+    <!-- Stats (visible when logged in) -->
+    <div class="stats" id="stats-section" style="display: none;">
+      <div class="stat">
+        <div class="stat-value" id="total-saved">0</div>
+        <div class="stat-label">Saved Deals</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="this-week">0</div>
+        <div class="stat-label">This Week</div>
+      </div>
+    </div>
+
+    <!-- Usage bar (visible when logged in) -->
+    <div class="usage-bar-container" id="usage-section" style="display: none;">
+      <div class="usage-label">
+        <span>Lookups Today</span>
+        <span id="usage-text">0/10</span>
+      </div>
+      <div class="usage-bar">
+        <div class="usage-fill" id="usage-fill" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login section (shown when not logged in) -->
+  <div class="login-section" id="login-section">
+    <div class="login-title">Sign in to FlipRadar</div>
+    <div class="login-desc">Get real eBay prices, save unlimited deals, and track your profits</div>
+    <button class="login-btn" id="login-btn">Sign In Free</button>
+  </div>
+
+  <!-- Upgrade banner (shown for free tier) -->
+  <div class="upgrade-banner" id="upgrade-banner" style="display: none;">
+    <div class="upgrade-title">Unlock More Features</div>
+    <div class="upgrade-desc">Get real eBay sold data, more lookups, and unlimited deals</div>
+    <button class="upgrade-btn" id="upgrade-btn">Upgrade Now</button>
+  </div>
+
+  <div class="content">
+    <!-- Tabs -->
+    <div class="tabs" id="tabs-section" style="display: none;">
+      <button class="tab active" data-tab="cloud">Cloud Deals</button>
+      <button class="tab" data-tab="local">Local Deals</button>
+    </div>
+
+    <div class="section-header">
+      <span class="section-title">Saved Deals</span>
+      <button class="clear-btn" id="clear-all">Clear All</button>
+    </div>
+
+    <div id="deals-container">
+      <!-- Deals will be inserted here -->
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-links">
+      <a href="#" class="footer-link" id="dashboard-link">Dashboard</a>
+      <a href="#" class="footer-link" id="settings-link">Settings</a>
+    </div>
+    <div class="footer-text">
+      Visit <a href="https://www.facebook.com/marketplace" target="_blank" class="footer-link">FB Marketplace</a> to find deals
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
