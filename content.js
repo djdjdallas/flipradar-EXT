@@ -21,23 +21,39 @@
   }
 
   // Wait for the DOM to actually show new item content
-  function waitForNewContent(previousTitle, timeout = 5000) {
+  function waitForNewContent(previousTitle, currentItemId, timeout = 5000) {
     return new Promise((resolve) => {
       const startTime = Date.now();
+      const MIN_WAIT_MS = 500; // Minimum wait time for DOM to settle
 
       const check = () => {
         const currentTitle = extractors.getTitle();
+        const elapsed = Date.now() - startTime;
 
-        // Content has changed (different title) or we found a title when there wasn't one
-        if (currentTitle && currentTitle !== previousTitle) {
+        // Skip generic titles like "Marketplace" - keep waiting
+        const isGenericTitle = currentTitle && (
+          currentTitle.toLowerCase() === 'marketplace' ||
+          currentTitle.toLowerCase().includes('facebook') ||
+          currentTitle.length < 5
+        );
+
+        // Content has changed to a real title (different from previous)
+        if (currentTitle && !isGenericTitle && currentTitle !== previousTitle && elapsed >= MIN_WAIT_MS) {
           console.log('[FlipRadar] Content changed, new title:', currentTitle);
           resolve(true);
           return;
         }
 
+        // If no previous title (first load), wait for any real title after minimum wait
+        if (!previousTitle && currentTitle && !isGenericTitle && elapsed >= MIN_WAIT_MS) {
+          console.log('[FlipRadar] First load, found title:', currentTitle);
+          resolve(true);
+          return;
+        }
+
         // Timeout reached
-        if (Date.now() - startTime > timeout) {
-          console.log('[FlipRadar] Timeout waiting for content change');
+        if (elapsed > timeout) {
+          console.log('[FlipRadar] Timeout waiting for content change, current title:', currentTitle);
           resolve(false);
           return;
         }
@@ -1185,7 +1201,7 @@
     const previousTitle = lastExtractedData?.title || null;
 
     // Wait for content to actually change (or timeout after 5s)
-    await waitForNewContent(previousTitle, 5000);
+    await waitForNewContent(previousTitle, itemId, 5000);
 
     // Verify URL hasn't changed during wait
     if (window.location.href !== currentPageUrl) {
@@ -1315,8 +1331,8 @@
   function showTriggerButton() {
     console.log('[FlipRadar] showTriggerButton called for URL:', window.location.href);
 
-    // Clear previous extracted data to force fresh extraction
-    lastExtractedData = null;
+    // DON'T clear lastExtractedData here - we need it to detect when content actually changes
+    // The item ID validation will catch any stale data
 
     // Always remove existing overlay when showing button for a new item
     const existingOverlay = document.getElementById(OVERLAY_ID);
