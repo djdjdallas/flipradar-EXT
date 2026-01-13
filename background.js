@@ -1,7 +1,7 @@
 // FlipRadar - Background Service Worker
 
-// API base URL - change to production URL when deploying
-const API_BASE_URL = 'http://localhost:3000';
+// API base URL
+const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
 
 // Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -42,6 +42,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'getApiBaseUrl') {
     sendResponse({ url: API_BASE_URL });
+  }
+
+  // Relay sold data capture events from eBay tabs to FB Marketplace tabs
+  if (message.type === 'soldDataCaptured') {
+    chrome.tabs.query({ url: '*://www.facebook.com/marketplace/*' }, (tabs) => {
+      tabs.forEach(tab => {
+        chrome.tabs.sendMessage(tab.id, {
+          type: 'soldDataAvailable',
+          data: message.data
+        }).catch(() => {}); // Ignore errors for inactive tabs
+      });
+    });
+    sendResponse({ success: true });
   }
 
   return true;

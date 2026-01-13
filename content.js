@@ -2,8 +2,14 @@
 (function() {
   'use strict';
 
+  // Constants
   const OVERLAY_ID = 'flipradar-overlay';
-  const API_BASE_URL = 'http://localhost:3000'; // Change to production URL when deploying
+  const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
+  const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+  const MAX_LOCAL_DEALS = 100;
+  const EBAY_FEE_MULTIPLIER = 0.84; // 13% eBay + 3% payment fees
+  const PAGE_LOAD_DELAY_MS = 1000; // Wait for FB page to load
+
   let currentUrl = window.location.href;
   let authToken = null;
   let currentUser = null;
@@ -12,6 +18,11 @@
   async function initAuth() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: 'getAuthToken' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[FlipRadar] Error loading auth state:', chrome.runtime.lastError);
+          resolve();
+          return;
+        }
         if (response) {
           authToken = response.token;
           currentUser = response.user;
@@ -196,6 +207,25 @@
     return '$' + price.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   }
 
+  // Escape HTML to prevent XSS
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Sanitize URL to prevent javascript: and data: XSS attacks
+  function sanitizeUrl(url) {
+    if (!url) return '#';
+    try {
+      const parsed = new URL(url);
+      return ['https:', 'http:'].includes(parsed.protocol) ? url : '#';
+    } catch {
+      return '#';
+    }
+  }
+
   // Generate eBay search URL
   function getEbayUrl(title) {
     if (!title) return null;
@@ -245,6 +275,59 @@
     }
   }
 
+  // Check if stored data is fresh (less than 24 hours old)
+  function isDataFresh(timestamp) {
+    if (!timestamp) return false;
+    const age = Date.now() - timestamp;
+    return age < CACHE_TTL_MS;
+  }
+
+  // Check for stored sold data that matches the current item
+  async function getStoredSoldData(title) {
+    return new Promise((resolve) => {
+      if (!title) {
+        resolve(null);
+        return;
+      }
+
+      // Create a simplified key from the title
+      const queryKey = title
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, '_')
+        .substring(0, 50);
+
+      const storageKey = `flipradar_sold_${queryKey}`;
+
+      // Try exact match first, then fall back to last lookup
+      chrome.storage.local.get([storageKey, 'flipradar_last_sold'], (result) => {
+        // Check if we have an exact match
+        if (result[storageKey] && isDataFresh(result[storageKey].timestamp)) {
+          resolve(result[storageKey]);
+          return;
+        }
+
+        // Check if last lookup is relevant (fuzzy match on query)
+        if (result.flipradar_last_sold && isDataFresh(result.flipradar_last_sold.timestamp)) {
+          const lastQuery = result.flipradar_last_sold.query.toLowerCase();
+          const currentTitle = title.toLowerCase();
+
+          // Check if there's meaningful overlap
+          const lastWords = lastQuery.split(/\s+/).filter(w => w.length > 3);
+          const titleWords = currentTitle.split(/\s+/).filter(w => w.length > 3);
+          const overlap = lastWords.filter(w => titleWords.some(tw => tw.includes(w) || w.includes(tw)));
+
+          if (overlap.length >= 2 || (lastWords.length <= 2 && overlap.length >= 1)) {
+            resolve(result.flipradar_last_sold);
+            return;
+          }
+        }
+
+        resolve(null);
+      });
+    });
+  }
+
   // Save deal to API
   async function saveDealToApi(data, priceData) {
     if (!authToken) {
@@ -261,15 +344,12 @@
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          fb_url: window.location.href,
-          title: data.title,
-          asking_price: data.price,
-          image_url: data.imageUrl,
-          location: data.location,
-          seller_name: data.seller,
-          ebay_low: priceData?.ebay_low,
-          ebay_high: priceData?.ebay_high,
-          ebay_url: priceData?.ebay_url || getEbayUrl(data.title)
+          source_url: window.location.href,
+          user_title: data.title,
+          user_asking_price: data.price,
+          ebay_estimate_low: priceData?.ebay_low,
+          ebay_estimate_high: priceData?.ebay_high,
+          ebay_search_url: priceData?.ebay_url || getEbayUrl(data.title)
         })
       });
 
@@ -309,7 +389,7 @@
     chrome.storage.local.get(['savedDeals'], (result) => {
       const deals = result.savedDeals || [];
       deals.unshift(deal);
-      if (deals.length > 100) {
+      if (deals.length > MAX_LOCAL_DEALS) {
         deals.pop();
       }
       chrome.storage.local.set({ savedDeals: deals });
@@ -317,7 +397,7 @@
   }
 
   // Create and inject overlay
-  function createOverlay(data, priceData = null) {
+  async function createOverlay(data, priceData = null) {
     const existing = document.getElementById(OVERLAY_ID);
     if (existing) {
       existing.remove();
@@ -336,7 +416,7 @@
     let profitLow = null;
     let profitHigh = null;
     if (hasApiData && data.price) {
-      const feeMultiplier = 0.84; // 13% eBay + 3% payment
+      const feeMultiplier = EBAY_FEE_MULTIPLIER;
       profitLow = Math.round((priceData.ebay_low * feeMultiplier) - data.price);
       profitHigh = Math.round((priceData.ebay_high * feeMultiplier) - data.price);
     }
@@ -578,6 +658,34 @@
           justify-content: space-between;
         }
         .sample-price { color: #4ade80; }
+        .ebay-section.real-data {
+          background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+          border: 1px solid #10b981;
+        }
+        .real-badge {
+          background: #10b981;
+          color: #fff;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 9px;
+          font-weight: 700;
+          margin-right: 4px;
+        }
+        .ebay-stats-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+          color: #a7f3d0;
+          margin-top: 4px;
+        }
+        .get-real-data {
+          margin-top: 8px;
+          padding-top: 8px;
+          border-top: 1px solid #2d2d44;
+          font-size: 11px;
+          color: #fbbf24;
+          text-align: center;
+        }
       </style>
     `;
 
@@ -616,7 +724,7 @@
 
         <div class="price-section">
           <div class="current-price">${formatPrice(data.price)}</div>
-          <div class="title" title="${data.title || ''}">${data.title || 'Unknown Item'}</div>
+          <div class="title" title="${escapeHtml(data.title || '')}">${escapeHtml(data.title) || 'Unknown Item'}</div>
         </div>
 
         ${suspicious ? '<div class="warning">Warning: Price seems suspiciously low</div>' : ''}
@@ -642,8 +750,68 @@
       `;
     }
 
+    // Check for real sold data from eBay page reader
+    const soldData = await getStoredSoldData(data.title);
+    const hasRealSoldData = soldData && soldData.stats && soldData.stats.count > 0;
+
     // eBay price section
-    if (hasApiData) {
+    if (hasRealSoldData) {
+      // Show REAL sold data from eBay page reader
+      const stats = soldData.stats;
+
+      // Recalculate profit with real sold data
+      if (data.price) {
+        const feeMultiplier = 0.84;
+        profitLow = Math.round((stats.low * feeMultiplier) - data.price);
+        profitHigh = Math.round((stats.high * feeMultiplier) - data.price);
+
+        // Update profit class
+        if (profitHigh < 0) {
+          profitClass = 'profit-negative';
+        } else if (profitLow < 0) {
+          profitClass = 'profit-mixed';
+        } else {
+          profitClass = 'profit-positive';
+        }
+      }
+
+      html += `
+        <div class="ebay-section real-data">
+          <div class="ebay-label">
+            <span class="real-badge">REAL</span> eBay Sold Prices
+          </div>
+          <div class="ebay-range">${formatPrice(stats.low)} - ${formatPrice(stats.high)}</div>
+          <div class="ebay-stats-row">
+            <span>Median: ${formatPrice(stats.median)}</span>
+            <span>Avg: ${formatPrice(stats.avg)}</span>
+          </div>
+          <div class="source-tag">${stats.count} sold listings analyzed</div>
+          ${soldData.samples && soldData.samples.length > 0 ? `
+            <div class="samples">
+              ${soldData.samples.slice(0, 3).map(s => `
+                <div class="sample-item">
+                  <span>${s.title.substring(0, 25)}...</span>
+                  <span class="sample-price">$${s.price}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      // Profit section with real data
+      if (profitLow !== null) {
+        html += `
+          <div class="profit-section">
+            <div class="profit-label">Est. Profit (after fees)</div>
+            <div class="profit-range ${profitClass}">
+              ${profitLow >= 0 ? '+' : ''}$${profitLow} to ${profitHigh >= 0 ? '+' : ''}$${profitHigh}
+            </div>
+          </div>
+        `;
+      }
+    } else if (hasApiData) {
+      // Show API estimate data
       const sourceLabels = {
         estimate: 'Basic estimate',
         ebay_active: 'eBay active listings',
@@ -666,6 +834,9 @@
               `).join('')}
             </div>
           ` : ''}
+          <div class="get-real-data">
+            Click "Check eBay Sold Prices" below for real prices
+          </div>
         </div>
       `;
 
@@ -689,7 +860,7 @@
           <div class="ebay-section">
             <div class="ebay-label">Est. eBay Value (rough)</div>
             <div class="ebay-range">${formatPrice(basicLow)} - ${formatPrice(basicHigh)}</div>
-            <div class="source-tag">Sign in for real data</div>
+            <div class="source-tag">Sign in for better data</div>
           </div>
         `;
       }
@@ -698,13 +869,13 @@
     // Meta info
     html += `
       <div class="meta">
-        ${data.location ? `<div class="meta-item">Location: ${data.location}</div>` : ''}
-        ${data.seller ? `<div class="meta-item">Seller: ${data.seller}</div>` : ''}
-        ${data.daysListed ? `<div class="meta-item">${data.daysListed}</div>` : ''}
+        ${data.location ? `<div class="meta-item">Location: ${escapeHtml(data.location)}</div>` : ''}
+        ${data.seller ? `<div class="meta-item">Seller: ${escapeHtml(data.seller)}</div>` : ''}
+        ${data.daysListed ? `<div class="meta-item">${escapeHtml(data.daysListed)}</div>` : ''}
       </div>
 
       <div class="buttons">
-        ${ebayUrl ? `<a href="${ebayUrl}" target="_blank" rel="noopener" class="btn btn-primary">Check eBay Sold Prices</a>` : ''}
+        ${ebayUrl ? `<a href="${sanitizeUrl(ebayUrl)}" target="_blank" rel="noopener" class="btn btn-primary">Check eBay Sold Prices</a>` : ''}
         <button class="btn btn-success" id="save-deal">Save Deal</button>
       </div>
 
@@ -719,6 +890,13 @@
         </div>
       `;
     }
+
+    // eBay attribution footer
+    html += `
+      <div class="footer" style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #2d2d44; font-size: 10px; color: #666; text-align: center;">
+        Pricing data powered by eBay. eBay and the eBay logo are trademarks of eBay Inc.
+      </div>
+    `;
 
     html += `</div>`;
 
@@ -863,12 +1041,12 @@
       if (authToken && data.title) {
         createLoadingOverlay(data);
         const priceData = await fetchPriceData(data.title);
-        createOverlay(data, priceData);
+        await createOverlay(data, priceData);
       } else {
         // Show overlay without API data
-        createOverlay(data, null);
+        await createOverlay(data, null);
       }
-    }, 1000);
+    }, PAGE_LOAD_DELAY_MS);
   }
 
   // Check if we're on a marketplace item page
@@ -879,20 +1057,34 @@
   // Handle navigation (Facebook is a SPA)
   function setupNavigationObserver() {
     let lastUrl = window.location.href;
+    let debounceTimeout = null;
+    const DEBOUNCE_MS = 100;
 
     const observer = new MutationObserver(() => {
-      if (window.location.href !== lastUrl) {
-        lastUrl = window.location.href;
+      // Debounce navigation checks to avoid excessive processing
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+      }
 
-        if (isMarketplaceItemPage()) {
-          initOverlay();
-        } else {
-          const overlay = document.getElementById(OVERLAY_ID);
-          if (overlay) {
-            overlay.remove();
+      debounceTimeout = setTimeout(() => {
+        if (window.location.href !== lastUrl) {
+          lastUrl = window.location.href;
+
+          if (isMarketplaceItemPage()) {
+            showTriggerButton();
+          } else {
+            // Remove trigger button and overlay when navigating away
+            const triggerBtn = document.getElementById('flipradar-trigger');
+            if (triggerBtn) {
+              triggerBtn.remove();
+            }
+            const overlay = document.getElementById(OVERLAY_ID);
+            if (overlay) {
+              overlay.remove();
+            }
           }
         }
-      }
+      }, DEBOUNCE_MS);
     });
 
     observer.observe(document.body, {
@@ -912,12 +1104,54 @@
         }
       });
     }
+
+    // Listen for sold data captured from eBay tabs
+    if (message.type === 'soldDataAvailable') {
+      console.log('[FlipRadar] Received sold data from eBay:', message.data);
+
+      // If overlay is open, refresh it to show new sold data
+      if (document.getElementById(OVERLAY_ID) && isMarketplaceItemPage()) {
+        // Re-initialize overlay to pick up new sold data
+        initOverlay();
+      }
+    }
   });
+
+  // Show trigger button (user must click to activate)
+  function showTriggerButton() {
+    const existingBtn = document.getElementById('flipradar-trigger');
+    if (existingBtn) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'flipradar-trigger';
+    btn.innerHTML = '💰 Check Flip';
+    btn.style.cssText = `
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      z-index: 2147483646;
+      background: #4ade80;
+      color: #1a1a2e;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
+    btn.addEventListener('click', () => {
+      btn.remove();
+      initOverlay();
+    });
+    document.body.appendChild(btn);
+  }
 
   // Initialize
   function init() {
     if (isMarketplaceItemPage()) {
-      initOverlay();
+      showTriggerButton();
     }
     setupNavigationObserver();
   }

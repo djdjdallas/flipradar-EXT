@@ -1,16 +1,16 @@
 {
   "manifest_version": 3,
   "name": "FlipRadar",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Quickly assess profit potential on Facebook Marketplace by comparing prices to eBay sold listings.",
   "permissions": [
     "storage",
-    "tabs"
+    "activeTab"
   ],
   "host_permissions": [
     "*://www.facebook.com/*",
-    "*://localhost:3000/*",
-    "*://*.flipradar.com/*"
+    "*://www.ebay.com/*",
+    "*://flipradar-iaxg.vercel.app/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -29,6 +29,9 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -36,6 +39,14 @@
       ],
       "js": ["content.js"],
       "css": ["styles.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://www.ebay.com/sch/*",
+        "*://www.ebay.com/b/*"
+      ],
+      "js": ["ebay-reader.js"],
       "run_at": "document_idle"
     }
   ]

@@ -477,9 +477,72 @@
     .upgrade-btn:hover {
       background: #f3f4f6;
     }
+
+    .error-alert {
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 12px 16px;
+      margin: 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .error-alert.show {
+      display: flex;
+    }
+
+    .error-icon {
+      font-size: 16px;
+    }
+
+    .error-text {
+      flex: 1;
+    }
+
+    .error-dismiss {
+      background: none;
+      border: none;
+      color: #fca5a5;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .error-dismiss:hover {
+      color: #fff;
+    }
+
+    .offline-indicator {
+      background: #78350f;
+      color: #fbbf24;
+      padding: 8px 16px;
+      text-align: center;
+      font-size: 12px;
+      display: none;
+    }
+
+    .offline-indicator.show {
+      display: block;
+    }
   </style>
 </head>
 <body>
+  <!-- Offline indicator -->
+  <div class="offline-indicator" id="offline-indicator">
+    You're offline. Showing cached data.
+  </div>
+
+  <!-- Error alert -->
+  <div class="error-alert" id="error-alert">
+    <span class="error-icon">⚠️</span>
+    <span class="error-text" id="error-text"></span>
+    <button class="error-dismiss" id="error-dismiss">&times;</button>
+  </div>
+
   <div class="header">
     <div class="header-top">
       <span class="logo">FlipRadar</span>
@@ -555,6 +618,9 @@
     </div>
     <div class="footer-text">
       Visit <a href="https://www.facebook.com/marketplace" target="_blank" class="footer-link">FB Marketplace</a> to find deals
+    </div>
+    <div class="footer-text" style="font-size: 10px; color: #555; margin-top: 4px;">
+      eBay and the eBay logo are trademarks of eBay Inc.
     </div>
   </div>
 

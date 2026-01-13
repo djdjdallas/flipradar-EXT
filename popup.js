@@ -1,14 +1,54 @@
 // FlipRadar - Popup Script
 
-const API_BASE_URL = 'http://localhost:3000'; // Change to production URL when deploying
+const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
 
 let authToken = null;
 let currentUser = null;
 let currentTab = 'cloud';
 
+// Error handling
+function showError(message) {
+  const errorAlert = document.getElementById('error-alert');
+  const errorText = document.getElementById('error-text');
+  if (errorAlert && errorText) {
+    errorText.textContent = message;
+    errorAlert.classList.add('show');
+  }
+}
+
+function hideError() {
+  const errorAlert = document.getElementById('error-alert');
+  if (errorAlert) {
+    errorAlert.classList.remove('show');
+  }
+}
+
+// Offline detection
+function updateOfflineIndicator() {
+  const indicator = document.getElementById('offline-indicator');
+  if (indicator) {
+    if (!navigator.onLine) {
+      indicator.classList.add('show');
+    } else {
+      indicator.classList.remove('show');
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
+  // Setup offline detection
+  updateOfflineIndicator();
+  window.addEventListener('online', updateOfflineIndicator);
+  window.addEventListener('offline', updateOfflineIndicator);
+
+  // Setup error dismiss
+  const dismissBtn = document.getElementById('error-dismiss');
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', hideError);
+  }
+
   await loadAuthState();
   updateUI();
   setupEventListeners();
@@ -24,6 +64,11 @@ async function init() {
 async function loadAuthState() {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: 'getAuthToken' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('[FlipRadar] Error loading auth state:', chrome.runtime.lastError);
+        resolve();
+        return;
+      }
       if (response) {
         authToken = response.token;
         currentUser = response.user;
@@ -124,6 +169,9 @@ function setupEventListeners() {
 
 async function handleLogout() {
   chrome.runtime.sendMessage({ type: 'logout' }, () => {
+    if (chrome.runtime.lastError) {
+      console.error('[FlipRadar] Error during logout:', chrome.runtime.lastError);
+    }
     authToken = null;
     currentUser = null;
     updateUI();
@@ -150,6 +198,12 @@ function handleTabChange(tab) {
 async function loadUsage() {
   if (!authToken) return;
 
+  // Check if offline
+  if (!navigator.onLine) {
+    console.log('[FlipRadar] Offline, skipping usage fetch');
+    return;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/usage`, {
       headers: {
@@ -157,7 +211,16 @@ async function loadUsage() {
       }
     });
 
-    if (!response.ok) return;
+    if (response.status === 401) {
+      // Token expired, will be handled by auth refresh
+      console.log('[FlipRadar] Token expired');
+      return;
+    }
+
+    if (!response.ok) {
+      console.error('[FlipRadar] Failed to load usage:', response.status);
+      return;
+    }
 
     const data = await response.json();
 
@@ -181,7 +244,8 @@ async function loadUsage() {
     // Update deal count
     document.getElementById('total-saved').textContent = data.deals?.saved || 0;
   } catch (error) {
-    console.error('Failed to load usage:', error);
+    console.error('[FlipRadar] Failed to load usage:', error);
+    // Don't show error for usage - it's not critical
   }
 }
 
@@ -199,6 +263,13 @@ async function loadCloudDeals() {
     </div>
   `;
 
+  // Check if offline
+  if (!navigator.onLine) {
+    showError('You\'re offline. Showing local deals instead.');
+    loadLocalDeals();
+    return;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/deals?limit=20`, {
       headers: {
@@ -206,15 +277,23 @@ async function loadCloudDeals() {
       }
     });
 
+    if (response.status === 401) {
+      showError('Session expired. Please sign in again.');
+      loadLocalDeals();
+      return;
+    }
+
     if (!response.ok) {
-      throw new Error('Failed to load deals');
+      throw new Error(`Server error: ${response.status}`);
     }
 
     const data = await response.json();
+    hideError(); // Clear any previous errors
     renderCloudDeals(data.deals || []);
     updateStats(data.deals || []);
   } catch (error) {
-    console.error('Failed to load cloud deals:', error);
+    console.error('[FlipRadar] Failed to load cloud deals:', error);
+    showError('Unable to load deals. Check your connection.');
     // Fallback to local deals
     loadLocalDeals();
   }
@@ -281,15 +360,15 @@ function renderLocalDeals(deals) {
 }
 
 function createCloudDealCard(deal) {
-  const price = deal.asking_price ? `$${deal.asking_price.toLocaleString()}` : 'N/A';
+  const price = deal.user_asking_price ? `$${deal.user_asking_price.toLocaleString()}` : 'N/A';
   const date = formatDate(deal.created_at);
 
   // Calculate profit if we have eBay data
   let profitHtml = '';
-  if (deal.ebay_low && deal.ebay_high && deal.asking_price) {
+  if (deal.ebay_estimate_low && deal.ebay_estimate_high && deal.user_asking_price) {
     const feeMultiplier = 0.84;
-    const profitLow = Math.round((deal.ebay_low * feeMultiplier) - deal.asking_price);
-    const profitHigh = Math.round((deal.ebay_high * feeMultiplier) - deal.asking_price);
+    const profitLow = Math.round((deal.ebay_estimate_low * feeMultiplier) - deal.user_asking_price);
+    const profitHigh = Math.round((deal.ebay_estimate_high * feeMultiplier) - deal.user_asking_price);
     const isNegative = profitHigh < 0;
     profitHtml = `
       <div class="deal-profit ${isNegative ? 'negative' : ''}">
@@ -299,17 +378,17 @@ function createCloudDealCard(deal) {
   }
 
   return `
-    <div class="deal-card synced" data-id="${deal.id}">
-      <div class="deal-title" title="${escapeHtml(deal.title)}">${escapeHtml(deal.title)}</div>
+    <div class="deal-card synced" data-id="${escapeHtml(String(deal.id))}">
+      <div class="deal-title" title="${escapeHtml(deal.user_title)}">${escapeHtml(deal.user_title)}</div>
       <div class="deal-meta">
         <span class="deal-price">${price}</span>
         <span class="deal-date">${date}</span>
       </div>
       ${profitHtml}
       <div class="deal-actions">
-        <a href="${deal.fb_url}" target="_blank" rel="noopener" class="deal-btn deal-btn-fb">View on FB</a>
-        ${deal.ebay_url ? `<a href="${deal.ebay_url}" target="_blank" rel="noopener" class="deal-btn deal-btn-ebay">eBay</a>` : ''}
-        <button class="deal-btn deal-btn-delete" data-id="${deal.id}" title="Delete">×</button>
+        <a href="${sanitizeUrl(deal.source_url)}" target="_blank" rel="noopener" class="deal-btn deal-btn-fb">View on FB</a>
+        ${deal.ebay_search_url ? `<a href="${sanitizeUrl(deal.ebay_search_url)}" target="_blank" rel="noopener" class="deal-btn deal-btn-ebay">eBay</a>` : ''}
+        <button class="deal-btn deal-btn-delete" data-id="${escapeHtml(String(deal.id))}" title="Delete">×</button>
       </div>
     </div>
   `;
@@ -320,16 +399,16 @@ function createLocalDealCard(deal) {
   const date = formatDate(deal.savedAt);
 
   return `
-    <div class="deal-card" data-id="${deal.id}">
+    <div class="deal-card" data-id="${escapeHtml(String(deal.id))}">
       <div class="deal-title" title="${escapeHtml(deal.title)}">${escapeHtml(deal.title)}</div>
       <div class="deal-meta">
         <span class="deal-price">${price}</span>
         <span class="deal-date">${date}</span>
       </div>
       <div class="deal-actions">
-        <a href="${deal.url}" target="_blank" rel="noopener" class="deal-btn deal-btn-fb">View on FB</a>
-        ${deal.ebayUrl ? `<a href="${deal.ebayUrl}" target="_blank" rel="noopener" class="deal-btn deal-btn-ebay">eBay</a>` : ''}
-        <button class="deal-btn deal-btn-delete" data-id="${deal.id}" title="Delete">×</button>
+        <a href="${sanitizeUrl(deal.url)}" target="_blank" rel="noopener" class="deal-btn deal-btn-fb">View on FB</a>
+        ${deal.ebayUrl ? `<a href="${sanitizeUrl(deal.ebayUrl)}" target="_blank" rel="noopener" class="deal-btn deal-btn-ebay">eBay</a>` : ''}
+        <button class="deal-btn deal-btn-delete" data-id="${escapeHtml(String(deal.id))}" title="Delete">×</button>
       </div>
     </div>
   `;
@@ -354,6 +433,11 @@ function updateStats(deals) {
 async function deleteCloudDeal(dealId) {
   if (!authToken) return;
 
+  if (!navigator.onLine) {
+    showError('Cannot delete while offline.');
+    return;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/deals?id=${dealId}`, {
       method: 'DELETE',
@@ -363,10 +447,14 @@ async function deleteCloudDeal(dealId) {
     });
 
     if (response.ok) {
+      hideError();
       loadCloudDeals();
+    } else {
+      showError('Failed to delete deal. Please try again.');
     }
   } catch (error) {
-    console.error('Failed to delete deal:', error);
+    console.error('[FlipRadar] Failed to delete deal:', error);
+    showError('Failed to delete deal. Check your connection.');
   }
 }
 
@@ -419,4 +507,14 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+function sanitizeUrl(url) {
+  if (!url) return '#';
+  try {
+    const parsed = new URL(url);
+    return ['https:', 'http:'].includes(parsed.protocol) ? url : '#';
+  } catch {
+    return '#';
+  }
 }
