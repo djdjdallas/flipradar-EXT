@@ -8,11 +8,47 @@
   const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
   const MAX_LOCAL_DEALS = 100;
   const EBAY_FEE_MULTIPLIER = 0.84; // 13% eBay + 3% payment fees
-  const PAGE_LOAD_DELAY_MS = 1000; // Wait for FB page to load
 
   let currentUrl = window.location.href;
   let authToken = null;
   let currentUser = null;
+  let lastExtractedData = null; // Track previous item's data to detect changes
+
+  // Extract item ID from Facebook Marketplace URL
+  function getItemId() {
+    const match = window.location.href.match(/\/marketplace\/item\/(\d+)/);
+    return match ? match[1] : null;
+  }
+
+  // Wait for the DOM to actually show new item content
+  function waitForNewContent(previousTitle, timeout = 5000) {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+
+      const check = () => {
+        const currentTitle = extractors.getTitle();
+
+        // Content has changed (different title) or we found a title when there wasn't one
+        if (currentTitle && currentTitle !== previousTitle) {
+          console.log('[FlipRadar] Content changed, new title:', currentTitle);
+          resolve(true);
+          return;
+        }
+
+        // Timeout reached
+        if (Date.now() - startTime > timeout) {
+          console.log('[FlipRadar] Timeout waiting for content change');
+          resolve(false);
+          return;
+        }
+
+        // Check again in 200ms
+        setTimeout(check, 200);
+      };
+
+      check();
+    });
+  }
 
   // Initialize auth state
   async function initAuth() {
@@ -338,23 +374,23 @@
 
       return await response.json();
     } catch (error) {
-      console.error('[FlipRadar] API error:', error);
+      // Network error - will show overlay without API data
       return { error: 'network_error' };
     }
   }
 
   // Extract listing data using AI (backend)
+  // Note: This requires the /api/extract endpoint to be implemented on the backend
+  // If not available, falls back to DOM extraction silently
   async function extractWithAI() {
     if (!authToken) {
-      console.log('[FlipRadar] No auth token, skipping AI extraction');
+      // No auth token - skip AI extraction silently
       return null;
     }
 
     try {
       // Get page text content (limit to avoid huge payloads)
       const pageText = document.body.innerText.substring(0, 8000);
-
-      console.log('[FlipRadar] Calling AI extraction API...');
 
       const response = await fetch(`${API_BASE_URL}/api/extract`, {
         method: 'POST',
@@ -369,7 +405,7 @@
       });
 
       if (!response.ok) {
-        console.log('[FlipRadar] AI extraction failed:', response.status);
+        // Endpoint may not exist yet - this is expected, fall back silently
         return null;
       }
 
@@ -377,7 +413,7 @@
       console.log('[FlipRadar] AI extracted data:', data);
       return data;
     } catch (error) {
-      console.error('[FlipRadar] AI extraction error:', error);
+      // Network error or endpoint not available - fall back to DOM extraction silently
       return null;
     }
   }
@@ -482,7 +518,7 @@
 
       return { success: true };
     } catch (error) {
-      console.error('[FlipRadar] Save deal error:', error);
+      // Network error - fall back to local storage silently
       saveDealLocally(data);
       return { success: true, local: true };
     }
@@ -511,6 +547,13 @@
 
   // Create and inject overlay
   async function createOverlay(data, priceData = null) {
+    // Verify we're still on the same item before showing overlay
+    const currentItemId = getItemId();
+    if (data.itemId && data.itemId !== currentItemId) {
+      console.log('[FlipRadar] Data item ID mismatch, aborting overlay. Expected:', data.itemId, 'Current:', currentItemId);
+      return;
+    }
+
     const existing = document.getElementById(OVERLAY_ID);
     if (existing) {
       existing.remove();
@@ -1133,61 +1176,71 @@
   async function initOverlay() {
     await initAuth();
 
-    // Store current URL to verify we're extracting data for the right page
+    // Store current URL and item ID to verify we're extracting data for the right page
     const currentPageUrl = window.location.href;
-    console.log('[FlipRadar] initOverlay called for:', currentPageUrl);
+    const itemId = getItemId();
+    console.log('[FlipRadar] initOverlay called for:', currentPageUrl, 'itemId:', itemId);
 
-    setTimeout(async () => {
-      // Verify URL hasn't changed during the delay
-      if (window.location.href !== currentPageUrl) {
-        console.log('[FlipRadar] URL changed during delay, aborting');
-        return;
-      }
+    // Get the previous title to detect when content changes
+    const previousTitle = lastExtractedData?.title || null;
 
-      let data;
+    // Wait for content to actually change (or timeout after 5s)
+    await waitForNewContent(previousTitle, 5000);
 
-      // Try AI extraction first (more reliable)
-      const aiData = await extractWithAI();
-      if (aiData && (aiData.title || aiData.price)) {
-        console.log('[FlipRadar] Using AI extracted data');
-        data = {
-          title: aiData.title || null,
-          price: aiData.price || null,
-          location: aiData.location || null,
-          seller: aiData.seller || null,
-          daysListed: aiData.daysListed || null,
-          imageUrl: extractors.getImageUrl() // Still get image from DOM
-        };
-      } else {
-        // Fall back to DOM extraction
-        console.log('[FlipRadar] Falling back to DOM extraction');
-        data = {
-          title: extractors.getTitle(),
-          price: extractors.getPrice(),
-          location: extractors.getLocation(),
-          seller: extractors.getSeller(),
-          daysListed: extractors.getDaysListed(),
-          imageUrl: extractors.getImageUrl()
-        };
-      }
+    // Verify URL hasn't changed during wait
+    if (window.location.href !== currentPageUrl) {
+      console.log('[FlipRadar] URL changed during wait, aborting');
+      return;
+    }
 
-      console.log('[FlipRadar] Final extracted data for', currentPageUrl, ':', data);
+    let data;
 
-      if (!data.title && !data.price) {
-        console.log('[FlipRadar] Could not extract listing data');
-        return;
-      }
+    // Try AI extraction first (more reliable)
+    const aiData = await extractWithAI();
+    if (aiData && (aiData.title || aiData.price)) {
+      console.log('[FlipRadar] Using AI extracted data');
+      data = {
+        title: aiData.title || null,
+        price: aiData.price || null,
+        location: aiData.location || null,
+        seller: aiData.seller || null,
+        daysListed: aiData.daysListed || null,
+        imageUrl: extractors.getImageUrl(),
+        itemId: itemId
+      };
+    } else {
+      // Fall back to DOM extraction
+      console.log('[FlipRadar] Falling back to DOM extraction');
+      data = {
+        title: extractors.getTitle(),
+        price: extractors.getPrice(),
+        location: extractors.getLocation(),
+        seller: extractors.getSeller(),
+        daysListed: extractors.getDaysListed(),
+        imageUrl: extractors.getImageUrl(),
+        itemId: itemId
+      };
+    }
 
-      // Show loading overlay if logged in
-      if (authToken && data.title) {
-        createLoadingOverlay(data);
-        const priceData = await fetchPriceData(data.title);
-        await createOverlay(data, priceData);
-      } else {
-        // Show overlay without API data
-        await createOverlay(data, null);
-      }
-    }, PAGE_LOAD_DELAY_MS);
+    // Store for next comparison
+    lastExtractedData = data;
+
+    console.log('[FlipRadar] Final extracted data for', currentPageUrl, ':', data);
+
+    if (!data.title && !data.price) {
+      console.log('[FlipRadar] Could not extract listing data');
+      return;
+    }
+
+    // Show loading overlay if logged in
+    if (authToken && data.title) {
+      createLoadingOverlay(data);
+      const priceData = await fetchPriceData(data.title);
+      await createOverlay(data, priceData);
+    } else {
+      // Show overlay without API data
+      await createOverlay(data, null);
+    }
   }
 
   // Check if we're on a marketplace item page
@@ -1261,6 +1314,9 @@
   // Show trigger button (user must click to activate)
   function showTriggerButton() {
     console.log('[FlipRadar] showTriggerButton called for URL:', window.location.href);
+
+    // Clear previous extracted data to force fresh extraction
+    lastExtractedData = null;
 
     // Always remove existing overlay when showing button for a new item
     const existingOverlay = document.getElementById(OVERLAY_ID);
