@@ -64,37 +64,69 @@
 
     // Extract price
     getPrice: function() {
-      const selectors = [
-        'span[dir="auto"]:not([role])',
-        '[data-testid="marketplace_pdp_component"] span',
-        'div[role="main"] span'
-      ];
-
       const priceRegex = /^\$[\d,]+(\.\d{2})?$/;
-      const priceWithTextRegex = /\$[\d,]+(\.\d{2})?/;
 
-      for (const selector of selectors) {
-        const elements = document.querySelectorAll(selector);
-        for (const el of elements) {
-          const text = el.textContent.trim();
-          if (priceRegex.test(text)) {
-            return parsePrice(text);
+      // Strategy 1: Look for price near the title (h1)
+      // The listing price is usually displayed prominently near the title
+      const h1 = document.querySelector('h1');
+      if (h1) {
+        // Look at siblings and nearby elements
+        const parent = h1.closest('div');
+        if (parent) {
+          const nearbySpans = parent.parentElement?.querySelectorAll('span') || [];
+          for (const span of nearbySpans) {
+            const text = span.textContent.trim();
+            if (priceRegex.test(text)) {
+              const price = parsePrice(text);
+              console.log('[FlipRadar] Found price near title:', price);
+              return price;
+            }
           }
         }
       }
 
+      // Strategy 2: Look for large/prominent price elements
+      // FB usually shows the listing price in a larger font
       const allSpans = document.querySelectorAll('span');
+      const priceElements = [];
+
       for (const span of allSpans) {
         const text = span.textContent.trim();
         if (priceRegex.test(text)) {
-          return parsePrice(text);
+          const style = window.getComputedStyle(span);
+          const fontSize = parseFloat(style.fontSize) || 0;
+          const price = parsePrice(text);
+          priceElements.push({ element: span, price, fontSize });
         }
       }
 
-      const body = document.body.innerText;
-      const matches = body.match(priceWithTextRegex);
-      if (matches) {
-        return parsePrice(matches[0]);
+      // Sort by font size (larger = more prominent = likely the listing price)
+      priceElements.sort((a, b) => b.fontSize - a.fontSize);
+
+      if (priceElements.length > 0) {
+        // Filter out very small prices (likely shipping costs or other items)
+        // The listing price is usually > $5 and shown in larger font
+        const mainPrice = priceElements.find(p => p.price >= 5 && p.fontSize >= 14);
+        if (mainPrice) {
+          console.log('[FlipRadar] Found prominent price:', mainPrice.price, 'fontSize:', mainPrice.fontSize);
+          return mainPrice.price;
+        }
+
+        // Fall back to largest font price
+        console.log('[FlipRadar] Using largest price:', priceElements[0].price);
+        return priceElements[0].price;
+      }
+
+      // Strategy 3: Look in main content area
+      const mainContent = document.querySelector('div[role="main"]');
+      if (mainContent) {
+        const text = mainContent.innerText;
+        const priceMatch = text.match(/\$[\d,]+(\.\d{2})?/);
+        if (priceMatch) {
+          const price = parsePrice(priceMatch[0]);
+          console.log('[FlipRadar] Found price in main content:', price);
+          return price;
+        }
       }
 
       console.log('[FlipRadar] Could not extract price');
