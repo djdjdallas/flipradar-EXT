@@ -308,16 +308,22 @@
         }
 
         // Check if last lookup is relevant (fuzzy match on query)
+        // Only use if there's very strong overlap to avoid showing wrong data
         if (result.flipradar_last_sold && isDataFresh(result.flipradar_last_sold.timestamp)) {
           const lastQuery = result.flipradar_last_sold.query.toLowerCase();
           const currentTitle = title.toLowerCase();
 
-          // Check if there's meaningful overlap
+          // Check if there's meaningful overlap - require stronger match
           const lastWords = lastQuery.split(/\s+/).filter(w => w.length > 3);
           const titleWords = currentTitle.split(/\s+/).filter(w => w.length > 3);
           const overlap = lastWords.filter(w => titleWords.some(tw => tw.includes(w) || w.includes(tw)));
 
-          if (overlap.length >= 2 || (lastWords.length <= 2 && overlap.length >= 1)) {
+          // Require at least 50% word overlap for fuzzy match
+          const overlapRatio = titleWords.length > 0 ? overlap.length / titleWords.length : 0;
+          console.log('[FlipRadar] Fuzzy match check - overlap:', overlap.length, 'ratio:', overlapRatio);
+
+          if (overlapRatio >= 0.5 && overlap.length >= 2) {
+            console.log('[FlipRadar] Using fuzzy matched sold data');
             resolve(result.flipradar_last_sold);
             return;
           }
@@ -1020,7 +1026,17 @@
   async function initOverlay() {
     await initAuth();
 
+    // Store current URL to verify we're extracting data for the right page
+    const currentPageUrl = window.location.href;
+    console.log('[FlipRadar] initOverlay called for:', currentPageUrl);
+
     setTimeout(async () => {
+      // Verify URL hasn't changed during the delay
+      if (window.location.href !== currentPageUrl) {
+        console.log('[FlipRadar] URL changed during delay, aborting');
+        return;
+      }
+
       const data = {
         title: extractors.getTitle(),
         price: extractors.getPrice(),
@@ -1030,7 +1046,7 @@
         imageUrl: extractors.getImageUrl()
       };
 
-      console.log('[FlipRadar] Extracted data:', data);
+      console.log('[FlipRadar] Extracted data for', currentPageUrl, ':', data);
 
       if (!data.title && !data.price) {
         console.log('[FlipRadar] Could not extract listing data');
@@ -1119,11 +1135,19 @@
 
   // Show trigger button (user must click to activate)
   function showTriggerButton() {
-    console.log('[FlipRadar] showTriggerButton called');
+    console.log('[FlipRadar] showTriggerButton called for URL:', window.location.href);
+
+    // Always remove existing overlay when showing button for a new item
+    const existingOverlay = document.getElementById(OVERLAY_ID);
+    if (existingOverlay) {
+      console.log('[FlipRadar] Removing old overlay');
+      existingOverlay.remove();
+    }
+
     const existingBtn = document.getElementById('flipradar-trigger');
     if (existingBtn) {
-      console.log('[FlipRadar] Button already exists');
-      return;
+      console.log('[FlipRadar] Removing old button');
+      existingBtn.remove();
     }
 
     const btn = document.createElement('button');
