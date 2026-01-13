@@ -343,6 +343,45 @@
     }
   }
 
+  // Extract listing data using AI (backend)
+  async function extractWithAI() {
+    if (!authToken) {
+      console.log('[FlipRadar] No auth token, skipping AI extraction');
+      return null;
+    }
+
+    try {
+      // Get page text content (limit to avoid huge payloads)
+      const pageText = document.body.innerText.substring(0, 8000);
+
+      console.log('[FlipRadar] Calling AI extraction API...');
+
+      const response = await fetch(`${API_BASE_URL}/api/extract`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          pageText,
+          url: window.location.href
+        })
+      });
+
+      if (!response.ok) {
+        console.log('[FlipRadar] AI extraction failed:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('[FlipRadar] AI extracted data:', data);
+      return data;
+    } catch (error) {
+      console.error('[FlipRadar] AI extraction error:', error);
+      return null;
+    }
+  }
+
   // Check if stored data is fresh (less than 24 hours old)
   function isDataFresh(timestamp) {
     if (!timestamp) return false;
@@ -1105,16 +1144,34 @@
         return;
       }
 
-      const data = {
-        title: extractors.getTitle(),
-        price: extractors.getPrice(),
-        location: extractors.getLocation(),
-        seller: extractors.getSeller(),
-        daysListed: extractors.getDaysListed(),
-        imageUrl: extractors.getImageUrl()
-      };
+      let data;
 
-      console.log('[FlipRadar] Extracted data for', currentPageUrl, ':', data);
+      // Try AI extraction first (more reliable)
+      const aiData = await extractWithAI();
+      if (aiData && (aiData.title || aiData.price)) {
+        console.log('[FlipRadar] Using AI extracted data');
+        data = {
+          title: aiData.title || null,
+          price: aiData.price || null,
+          location: aiData.location || null,
+          seller: aiData.seller || null,
+          daysListed: aiData.daysListed || null,
+          imageUrl: extractors.getImageUrl() // Still get image from DOM
+        };
+      } else {
+        // Fall back to DOM extraction
+        console.log('[FlipRadar] Falling back to DOM extraction');
+        data = {
+          title: extractors.getTitle(),
+          price: extractors.getPrice(),
+          location: extractors.getLocation(),
+          seller: extractors.getSeller(),
+          daysListed: extractors.getDaysListed(),
+          imageUrl: extractors.getImageUrl()
+        };
+      }
+
+      console.log('[FlipRadar] Final extracted data for', currentPageUrl, ':', data);
 
       if (!data.title && !data.price) {
         console.log('[FlipRadar] Could not extract listing data');
