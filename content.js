@@ -36,24 +36,60 @@
   const extractors = {
     // Extract listing title
     getTitle: function() {
+      // Strategy 1: Get the h1 element directly (most reliable)
+      const h1 = document.querySelector('h1');
+      if (h1) {
+        // Get the text content, but try to get the most specific text
+        // Sometimes h1 contains nested spans
+        const spans = h1.querySelectorAll('span');
+        if (spans.length > 0) {
+          // Find the span with actual product title text
+          for (const span of spans) {
+            const text = span.textContent.trim();
+            // Product titles are usually longer and don't contain just prices
+            if (text.length > 10 && !text.startsWith('$') && !/^\d+$/.test(text)) {
+              console.log('[FlipRadar] Found title in h1 span:', text);
+              return text;
+            }
+          }
+        }
+        // Fall back to full h1 text
+        const h1Text = h1.textContent.trim();
+        if (h1Text.length > 5 && h1Text.length < 300) {
+          console.log('[FlipRadar] Found title in h1:', h1Text);
+          return h1Text;
+        }
+      }
+
+      // Strategy 2: Look for marketplace-specific elements
       const selectors = [
-        'h1 span',
         '[data-testid="marketplace_pdp_component"] h1',
         'div[role="main"] h1',
-        'span.x1lliihq.x6ikm8r.x10wlt62.x1n2onr6'
+        '[role="heading"][aria-level="1"]'
       ];
 
       for (const selector of selectors) {
         const el = document.querySelector(selector);
         if (el && el.textContent.trim()) {
-          return el.textContent.trim();
+          const text = el.textContent.trim();
+          if (text.length > 5 && text.length < 300) {
+            console.log('[FlipRadar] Found title via selector:', text);
+            return text;
+          }
         }
       }
 
-      const headings = document.querySelectorAll('h1, [role="heading"]');
+      // Strategy 3: Look for any prominent heading
+      const headings = document.querySelectorAll('h1, h2, [role="heading"]');
       for (const h of headings) {
         const text = h.textContent.trim();
-        if (text.length > 5 && text.length < 200) {
+        // Product titles are usually descriptive (longer than 10 chars)
+        // and don't start with $ or common UI text
+        if (text.length > 10 && text.length < 300 &&
+            !text.startsWith('$') &&
+            !text.toLowerCase().includes('marketplace') &&
+            !text.toLowerCase().includes('facebook')) {
+          console.log('[FlipRadar] Found title in heading:', text);
           return text;
         }
       }
