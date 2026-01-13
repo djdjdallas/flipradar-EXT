@@ -57,6 +57,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 
+  // Proxy API requests from content scripts to bypass CORS
+  // Content scripts run in page context, so requests appear from page origin
+  // Background script can make requests without CORS restrictions
+  if (message.type === 'apiRequest') {
+    (async () => {
+      try {
+        const fetchOptions = {
+          method: message.method || 'GET',
+          headers: message.headers || {}
+        };
+
+        // Only add body for non-GET requests
+        if (message.body && message.method !== 'GET') {
+          fetchOptions.body = JSON.stringify(message.body);
+        }
+
+        const response = await fetch(message.url, fetchOptions);
+
+        // Try to parse JSON response
+        let data;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        sendResponse({
+          ok: response.ok,
+          status: response.status,
+          data
+        });
+      } catch (error) {
+        console.error('[FlipRadar] API proxy error:', error);
+        sendResponse({
+          ok: false,
+          status: 0,
+          error: error.message
+        });
+      }
+    })();
+    return true; // Keep channel open for async response
+  }
+
   return true;
 });
 

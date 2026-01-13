@@ -359,43 +359,55 @@
     return `https://www.ebay.com/sch/i.html?_nkw=${encoded}&LH_Complete=1&LH_Sold=1&_sop=13`;
   }
 
-  // Fetch price data from API
+  // Fetch price data from API (via background script to bypass CORS)
   async function fetchPriceData(title) {
     if (!authToken) {
       return { error: 'auth_required' };
     }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/price-lookup`, {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'apiRequest',
+        url: `${API_BASE_URL}/api/price-lookup`,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({ title })
+        body: { title }
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[FlipRadar] Price lookup message error:', chrome.runtime.lastError);
+          resolve({ error: 'network_error' });
+          return;
+        }
+
+        if (!response) {
+          resolve({ error: 'network_error' });
+          return;
+        }
+
+        if (response.status === 401) {
+          resolve({ error: 'auth_required' });
+          return;
+        }
+
+        if (response.status === 429) {
+          resolve({ error: 'limit_reached', message: response.data?.error });
+          return;
+        }
+
+        if (!response.ok) {
+          resolve({ error: 'api_error' });
+          return;
+        }
+
+        resolve(response.data);
       });
-
-      if (response.status === 401) {
-        return { error: 'auth_required' };
-      }
-
-      if (response.status === 429) {
-        const data = await response.json();
-        return { error: 'limit_reached', message: data.error };
-      }
-
-      if (!response.ok) {
-        return { error: 'api_error' };
-      }
-
-      return await response.json();
-    } catch (error) {
-      // Network error - will show overlay without API data
-      return { error: 'network_error' };
-    }
+    });
   }
 
-  // Extract listing data using AI (backend)
+  // Extract listing data using AI (backend, via background script to bypass CORS)
   // Note: This requires the /api/extract endpoint to be implemented on the backend
   // If not available, falls back to DOM extraction silently
   async function extractWithAI() {
@@ -404,34 +416,39 @@
       return null;
     }
 
-    try {
+    return new Promise((resolve) => {
       // Get page text content (limit to avoid huge payloads)
       const pageText = document.body.innerText.substring(0, 8000);
 
-      const response = await fetch(`${API_BASE_URL}/api/extract`, {
+      chrome.runtime.sendMessage({
+        type: 'apiRequest',
+        url: `${API_BASE_URL}/api/extract`,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({
+        body: {
           pageText,
           url: window.location.href
-        })
+        }
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          // Message error - fall back silently
+          resolve(null);
+          return;
+        }
+
+        if (!response || !response.ok) {
+          // Endpoint may not exist yet - this is expected, fall back silently
+          resolve(null);
+          return;
+        }
+
+        console.log('[FlipRadar] AI extracted data:', response.data);
+        resolve(response.data);
       });
-
-      if (!response.ok) {
-        // Endpoint may not exist yet - this is expected, fall back silently
-        return null;
-      }
-
-      const data = await response.json();
-      console.log('[FlipRadar] AI extracted data:', data);
-      return data;
-    } catch (error) {
-      // Network error or endpoint not available - fall back to DOM extraction silently
-      return null;
-    }
+    });
   }
 
   // Check if stored data is fresh (less than 24 hours old)
@@ -493,7 +510,7 @@
     });
   }
 
-  // Save deal to API
+  // Save deal to API (via background script to bypass CORS)
   async function saveDealToApi(data, priceData) {
     if (!authToken) {
       // Fall back to local storage
@@ -501,43 +518,53 @@
       return { success: true, local: true };
     }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/deals`, {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'apiRequest',
+        url: `${API_BASE_URL}/api/deals`,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({
+        body: {
           source_url: window.location.href,
           user_title: data.title,
           user_asking_price: data.price,
           ebay_estimate_low: priceData?.ebay_low,
           ebay_estimate_high: priceData?.ebay_high,
           ebay_search_url: priceData?.ebay_url || getEbayUrl(data.title)
-        })
+        }
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[FlipRadar] Save deal message error:', chrome.runtime.lastError);
+          saveDealLocally(data);
+          resolve({ success: true, local: true });
+          return;
+        }
+
+        if (!response || !response.ok) {
+          if (response?.status === 401) {
+            saveDealLocally(data);
+            resolve({ success: true, local: true });
+            return;
+          }
+
+          if (response?.status === 429) {
+            resolve({ success: false, error: 'Deal limit reached. Upgrade to save more.' });
+            return;
+          }
+
+          console.error('[FlipRadar] API save failed:', response?.error || response?.status);
+          saveDealLocally(data);
+          resolve({ success: true, local: true });
+          return;
+        }
+
+        console.log('[FlipRadar] Deal saved to cloud successfully');
+        resolve({ success: true });
       });
-
-      if (response.status === 401) {
-        saveDealLocally(data);
-        return { success: true, local: true };
-      }
-
-      if (response.status === 429) {
-        return { success: false, error: 'Deal limit reached. Upgrade to save more.' };
-      }
-
-      if (!response.ok) {
-        saveDealLocally(data);
-        return { success: true, local: true };
-      }
-
-      return { success: true };
-    } catch (error) {
-      // Network error - fall back to local storage silently
-      saveDealLocally(data);
-      return { success: true, local: true };
-    }
+    });
   }
 
   // Save deal to local storage (fallback)
@@ -1264,7 +1291,45 @@
     return window.location.href.includes('/marketplace/item/');
   }
 
-  // Handle navigation (Facebook is a SPA)
+  // Handle navigation event (called when URL changes)
+  function handleNavigation() {
+    console.log('[FlipRadar] Navigation detected:', window.location.href);
+    if (isMarketplaceItemPage()) {
+      // Clear previous data and show new button
+      lastExtractedData = null;
+      showTriggerButton();
+    } else {
+      // Remove button/overlay when leaving marketplace item
+      const btn = document.getElementById('flipradar-trigger');
+      const overlay = document.getElementById(OVERLAY_ID);
+      if (btn) btn.remove();
+      if (overlay) overlay.remove();
+    }
+  }
+
+  // Intercept History API for reliable SPA navigation detection
+  function setupHistoryListener() {
+    // Store original methods
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+
+    // Override pushState
+    history.pushState = function(...args) {
+      originalPushState.apply(this, args);
+      handleNavigation();
+    };
+
+    // Override replaceState
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      handleNavigation();
+    };
+
+    // Also listen for popstate (back/forward buttons)
+    window.addEventListener('popstate', handleNavigation);
+  }
+
+  // Handle navigation (Facebook is a SPA) - backup observer
   function setupNavigationObserver() {
     let lastUrl = window.location.href;
     let debounceTimeout = null;
@@ -1379,10 +1444,15 @@
     console.log('[FlipRadar] Content script loaded on:', window.location.href);
     console.log('[FlipRadar] Is marketplace item page:', isMarketplaceItemPage());
 
+    // Setup History API listener (primary navigation detection for SPA)
+    setupHistoryListener();
+
     if (isMarketplaceItemPage()) {
       console.log('[FlipRadar] Showing trigger button...');
       showTriggerButton();
     }
+
+    // Keep MutationObserver as backup for edge cases
     setupNavigationObserver();
   }
 
