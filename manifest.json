@@ -5,7 +5,9 @@
   "description": "Quickly assess profit potential on Facebook Marketplace by comparing prices to eBay sold listings.",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs",
+    "alarms"
   ],
   "host_permissions": [
     "*://www.facebook.com/*",
