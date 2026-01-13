@@ -1119,8 +1119,12 @@
 
   // Show trigger button (user must click to activate)
   function showTriggerButton() {
+    console.log('[FlipRadar] showTriggerButton called');
     const existingBtn = document.getElementById('flipradar-trigger');
-    if (existingBtn) return;
+    if (existingBtn) {
+      console.log('[FlipRadar] Button already exists');
+      return;
+    }
 
     const btn = document.createElement('button');
     btn.id = 'flipradar-trigger';
@@ -1146,19 +1150,26 @@
       initOverlay();
     });
     document.body.appendChild(btn);
+    console.log('[FlipRadar] Button added to page:', btn);
   }
 
   // Initialize
   function init() {
+    console.log('[FlipRadar] Content script loaded on:', window.location.href);
+    console.log('[FlipRadar] Is marketplace item page:', isMarketplaceItemPage());
+
     if (isMarketplaceItemPage()) {
+      console.log('[FlipRadar] Showing trigger button...');
       showTriggerButton();
     }
     setupNavigationObserver();
   }
 
   if (document.readyState === 'loading') {
+    console.log('[FlipRadar] Waiting for DOMContentLoaded...');
     document.addEventListener('DOMContentLoaded', init);
   } else {
+    console.log('[FlipRadar] Document ready, initializing...');
     init();
   }
 })();
