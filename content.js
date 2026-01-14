@@ -26,6 +26,13 @@
       const startTime = Date.now();
       const MIN_WAIT_MS = 500; // Minimum wait time for DOM to settle
 
+      // If we're on the same item as before (re-clicking), skip wait
+      if (lastExtractedData?.itemId === currentItemId && lastExtractedData?.title) {
+        console.log('[FlipRadar] Same item, skipping wait. Using cached title:', lastExtractedData.title);
+        resolve(true);
+        return;
+      }
+
       const check = () => {
         const currentTitle = extractors.getTitle();
         const elapsed = Date.now() - startTime;
@@ -1295,8 +1302,8 @@
   function handleNavigation() {
     console.log('[FlipRadar] Navigation detected:', window.location.href);
     if (isMarketplaceItemPage()) {
-      // Clear previous data and show new button
-      lastExtractedData = null;
+      // DON'T clear lastExtractedData - we need it to detect when DOM actually updates
+      // waitForNewContent() uses previousTitle to know when content has changed
       showTriggerButton();
     } else {
       // Remove button/overlay when leaving marketplace item
