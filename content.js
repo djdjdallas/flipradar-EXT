@@ -14,6 +14,23 @@
   let currentUser = null;
   let lastExtractedData = null; // Track previous item's data to detect changes
 
+  // Helper to check if a title is generic/invalid (not an actual product title)
+  function isGenericTitle(text) {
+    if (!text) return true;
+    const lower = text.toLowerCase().trim();
+    return (
+      lower === 'marketplace' ||
+      lower === 'facebook marketplace' ||
+      lower.includes('facebook') ||
+      lower === 'listing' ||
+      lower === 'item' ||
+      lower === 'product' ||
+      lower === 'details' ||
+      lower === 'seller details' ||
+      text.length < 5
+    );
+  }
+
   // Extract item ID from Facebook Marketplace URL
   function getItemId() {
     const match = window.location.href.match(/\/marketplace\/item\/(\d+)/);
@@ -38,21 +55,17 @@
         const elapsed = Date.now() - startTime;
 
         // Skip generic titles like "Marketplace" - keep waiting
-        const isGenericTitle = currentTitle && (
-          currentTitle.toLowerCase() === 'marketplace' ||
-          currentTitle.toLowerCase().includes('facebook') ||
-          currentTitle.length < 5
-        );
+        const isGeneric = isGenericTitle(currentTitle);
 
         // Content has changed to a real title (different from previous)
-        if (currentTitle && !isGenericTitle && currentTitle !== previousTitle && elapsed >= MIN_WAIT_MS) {
+        if (currentTitle && !isGeneric && currentTitle !== previousTitle && elapsed >= MIN_WAIT_MS) {
           console.log('[FlipRadar] Content changed, new title:', currentTitle);
           resolve(true);
           return;
         }
 
         // If no previous title (first load), wait for any real title after minimum wait
-        if (!previousTitle && currentTitle && !isGenericTitle && elapsed >= MIN_WAIT_MS) {
+        if (!previousTitle && currentTitle && !isGeneric && elapsed >= MIN_WAIT_MS) {
           console.log('[FlipRadar] First load, found title:', currentTitle);
           resolve(true);
           return;
@@ -95,59 +108,69 @@
   const extractors = {
     // Extract listing title
     getTitle: function() {
-      // Strategy 1: Get the h1 element directly (most reliable)
-      const h1 = document.querySelector('h1');
-      if (h1) {
-        // Get the text content, but try to get the most specific text
-        // Sometimes h1 contains nested spans
-        const spans = h1.querySelectorAll('span');
-        if (spans.length > 0) {
-          // Find the span with actual product title text
-          for (const span of spans) {
-            const text = span.textContent.trim();
-            // Product titles are usually longer and don't contain just prices
-            if (text.length > 10 && !text.startsWith('$') && !/^\d+$/.test(text)) {
-              console.log('[FlipRadar] Found title in h1 span:', text);
+      // Strategy 1: Facebook-specific class-based selectors
+      // These target the actual product title span, not the page header
+      // Note: FB uses obfuscated classes that may change, so we try multiple
+      const fbTitleSelectors = [
+        'span.x1lliihq.x6ikm8r.x10wlt62.x1n2onr6:not(.xlyipyv)', // Title span (exclude location variant)
+        '[data-testid="marketplace_pdp_component"] span[dir="auto"]',
+        'div[role="main"] span.x1lliihq.x6ikm8r.x10wlt62'
+      ];
+
+      for (const selector of fbTitleSelectors) {
+        try {
+          const elements = document.querySelectorAll(selector);
+          for (const el of elements) {
+            const text = el.textContent.trim();
+            // Product titles are descriptive (longer), not prices, not generic
+            if (text.length > 15 && text.length < 300 &&
+                !text.startsWith('$') &&
+                !/^\d+$/.test(text) &&
+                !isGenericTitle(text)) {
+              console.log('[FlipRadar] Found title via FB selector:', text);
               return text;
             }
           }
-        }
-        // Fall back to full h1 text
-        const h1Text = h1.textContent.trim();
-        if (h1Text.length > 5 && h1Text.length < 300) {
-          console.log('[FlipRadar] Found title in h1:', h1Text);
-          return h1Text;
+        } catch (e) {
+          // Selector might be invalid, continue to next
         }
       }
 
-      // Strategy 2: Look for marketplace-specific elements
-      const selectors = [
-        '[data-testid="marketplace_pdp_component"] h1',
-        'div[role="main"] h1',
-        '[role="heading"][aria-level="1"]'
-      ];
+      // Strategy 2: Look for prominent text in main content area
+      // The title is usually the largest text block that's not a price
+      const mainContent = document.querySelector('div[role="main"]');
+      if (mainContent) {
+        const spans = mainContent.querySelectorAll('span[dir="auto"]');
+        const candidates = [];
 
-      for (const selector of selectors) {
-        const el = document.querySelector(selector);
-        if (el && el.textContent.trim()) {
-          const text = el.textContent.trim();
-          if (text.length > 5 && text.length < 300) {
-            console.log('[FlipRadar] Found title via selector:', text);
-            return text;
+        for (const span of spans) {
+          const text = span.textContent.trim();
+          if (text.length > 15 && text.length < 200 &&
+              !text.startsWith('$') &&
+              !isGenericTitle(text) &&
+              !/^\d+$/.test(text)) {
+            const style = window.getComputedStyle(span);
+            const fontSize = parseFloat(style.fontSize) || 0;
+            candidates.push({ text, fontSize, element: span });
           }
         }
+
+        // Sort by font size (larger = more prominent = likely title)
+        candidates.sort((a, b) => b.fontSize - a.fontSize);
+
+        if (candidates.length > 0) {
+          console.log('[FlipRadar] Found title by prominence:', candidates[0].text);
+          return candidates[0].text;
+        }
       }
 
-      // Strategy 3: Look for any prominent heading
+      // Strategy 3: Fallback to h1/headings (but filter generic titles)
       const headings = document.querySelectorAll('h1, h2, [role="heading"]');
       for (const h of headings) {
         const text = h.textContent.trim();
-        // Product titles are usually descriptive (longer than 10 chars)
-        // and don't start with $ or common UI text
         if (text.length > 10 && text.length < 300 &&
-            !text.startsWith('$') &&
-            !text.toLowerCase().includes('marketplace') &&
-            !text.toLowerCase().includes('facebook')) {
+            !isGenericTitle(text) &&
+            !text.startsWith('$')) {
           console.log('[FlipRadar] Found title in heading:', text);
           return text;
         }
