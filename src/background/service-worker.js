@@ -1,0 +1,166 @@
+// FlipRadar - Background Service Worker
+
+// API base URL
+const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
+
+// Listen for messages from content script and popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'openLogin') {
+    // Open login page in new tab
+    chrome.tabs.create({
+      url: `${API_BASE_URL}/auth/extension`
+    });
+    sendResponse({ success: true });
+  }
+
+  if (message.type === 'openUpgrade') {
+    // Open pricing page in new tab
+    chrome.tabs.create({
+      url: `${API_BASE_URL}/pricing`
+    });
+    sendResponse({ success: true });
+  }
+
+  if (message.type === 'getAuthToken') {
+    // Return stored auth token
+    chrome.storage.local.get(['authToken', 'user'], (result) => {
+      sendResponse({
+        token: result.authToken || null,
+        user: result.user || null
+      });
+    });
+    return true; // Keep channel open for async response
+  }
+
+  if (message.type === 'logout') {
+    // Clear auth data
+    chrome.storage.local.remove(['authToken', 'user'], () => {
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
+  if (message.type === 'getApiBaseUrl') {
+    sendResponse({ url: API_BASE_URL });
+  }
+
+  // Relay sold data capture events from eBay tabs to FB Marketplace tabs
+  if (message.type === 'soldDataCaptured') {
+    chrome.tabs.query({ url: '*://www.facebook.com/marketplace/*' }, (tabs) => {
+      tabs.forEach(tab => {
+        chrome.tabs.sendMessage(tab.id, {
+          type: 'soldDataAvailable',
+          data: message.data
+        }).catch(() => {}); // Ignore errors for inactive tabs
+      });
+    });
+    sendResponse({ success: true });
+  }
+
+  // Proxy API requests from content scripts to bypass CORS
+  // Content scripts run in page context, so requests appear from page origin
+  // Background script can make requests without CORS restrictions
+  if (message.type === 'apiRequest') {
+    (async () => {
+      try {
+        const fetchOptions = {
+          method: message.method || 'GET',
+          headers: message.headers || {}
+        };
+
+        // Only add body for non-GET requests
+        if (message.body && message.method !== 'GET') {
+          fetchOptions.body = JSON.stringify(message.body);
+        }
+
+        const response = await fetch(message.url, fetchOptions);
+
+        // Try to parse JSON response
+        let data;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        sendResponse({
+          ok: response.ok,
+          status: response.status,
+          data
+        });
+      } catch (error) {
+        console.error('[FlipRadar] API proxy error:', error);
+        sendResponse({
+          ok: false,
+          status: 0,
+          error: error.message
+        });
+      }
+    })();
+    return true; // Keep channel open for async response
+  }
+
+  return true;
+});
+
+// Listen for tab updates to catch auth callback
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url && changeInfo.url.includes('/auth/extension/callback')) {
+    handleAuthCallback(changeInfo.url, tabId);
+  }
+});
+
+// Handle the auth callback URL
+async function handleAuthCallback(url, tabId) {
+  try {
+    const urlObj = new URL(url);
+    const token = urlObj.searchParams.get('token');
+    const userJson = urlObj.searchParams.get('user');
+
+    if (token) {
+      const user = userJson ? JSON.parse(decodeURIComponent(userJson)) : null;
+
+      // Store the token and user info
+      await chrome.storage.local.set({
+        authToken: token,
+        user: user
+      });
+
+      console.log('[FlipRadar] Auth successful, token stored');
+
+      // Close the auth tab and show success
+      chrome.tabs.remove(tabId);
+
+      // Notify any open extension pages
+      chrome.runtime.sendMessage({ type: 'authSuccess', user });
+    }
+  } catch (error) {
+    console.error('[FlipRadar] Auth callback error:', error);
+  }
+}
+
+// Periodic token refresh (check if token is still valid)
+chrome.alarms.create('tokenRefresh', { periodInMinutes: 30 });
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === 'tokenRefresh') {
+    const result = await chrome.storage.local.get(['authToken']);
+    if (result.authToken) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/usage`, {
+          headers: {
+            'Authorization': `Bearer ${result.authToken}`
+          }
+        });
+
+        if (response.status === 401) {
+          // Token expired, clear it
+          await chrome.storage.local.remove(['authToken', 'user']);
+          console.log('[FlipRadar] Token expired, cleared');
+        }
+      } catch (error) {
+        console.error('[FlipRadar] Token refresh check failed:', error);
+      }
+    }
+  }
+});

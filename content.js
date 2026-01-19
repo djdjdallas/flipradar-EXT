@@ -18,17 +18,44 @@
   function isGenericTitle(text) {
     if (!text) return true;
     const lower = text.toLowerCase().trim();
-    return (
-      lower === 'marketplace' ||
-      lower === 'facebook marketplace' ||
-      lower.includes('facebook') ||
-      lower === 'listing' ||
-      lower === 'item' ||
-      lower === 'product' ||
-      lower === 'details' ||
-      lower === 'seller details' ||
-      text.length < 5
-    );
+
+    // Exact matches for common generic titles
+    const exactMatches = [
+      'marketplace', 'facebook marketplace', 'listing', 'item', 'product',
+      'details', 'seller details', 'description', 'about this item',
+      'chat history is missing', 'message seller', 'send message',
+      'is this still available', 'see more', 'see less', 'show more',
+      'sponsored', 'suggested for you', 'similar items', 'related items'
+    ];
+    if (exactMatches.includes(lower)) return true;
+
+    // Patterns that indicate Facebook UI elements, not product titles
+    const uiPatterns = [
+      /^(send|chat|message|call|contact)/i,
+      /^(see|view|show|hide|load)\s+(more|less|all)/i,
+      /facebook/i,
+      /messenger/i,
+      /^(listed|posted|sold)\s+(in|on|ago)/i,
+      /^\d+\s+(views?|likes?|saves?|comments?)/i,
+      /^(share|save|report|hide)\s*(this)?/i,
+      /history is (missing|unavailable)/i,
+      /^(sign|log)\s*(in|out|up)/i,
+      /^(join|create|start)/i,
+      /enter your pin/i,                           // PIN prompts
+      /restore chat/i,                             // Chat restore prompts
+      /end-to-end encrypted/i,                     // Encryption notices
+      /^\d+\s*(new\s*)?(message|notification)/i,   // Message counts
+      /your (message|chat|conversation)/i,         // Chat references
+      /turn on notifications/i,                    // Notification prompts
+      /^\s*•\s*/,                                  // Bullet point UI elements
+      /^(tap|click|press)\s+(to|here)/i,           // Action prompts
+      /learn more$/i                               // "Learn more" links
+    ];
+    for (const pattern of uiPatterns) {
+      if (pattern.test(text)) return true;
+    }
+
+    return text.length < 5;
   }
 
   // Extract item ID from Facebook Marketplace URL
@@ -438,17 +465,24 @@
   }
 
   // Extract listing data using AI (backend, via background script to bypass CORS)
-  // Note: This requires the /api/extract endpoint to be implemented on the backend
-  // If not available, falls back to DOM extraction silently
+  // This is the PRIMARY extraction method - more reliable than DOM scraping
   async function extractWithAI() {
     if (!authToken) {
-      // No auth token - skip AI extraction silently
+      console.log('[FlipRadar] AI extraction skipped - not logged in');
       return null;
     }
 
     return new Promise((resolve) => {
-      // Get page text content (limit to avoid huge payloads)
-      const pageText = document.body.innerText.substring(0, 8000);
+      // Get page text content - focus on main content area if possible
+      let pageText = '';
+      const mainContent = document.querySelector('div[role="main"]');
+      if (mainContent) {
+        pageText = mainContent.innerText.substring(0, 10000);
+      } else {
+        pageText = document.body.innerText.substring(0, 10000);
+      }
+
+      console.log('[FlipRadar] Sending page text to AI extraction (' + pageText.length + ' chars)');
 
       chrome.runtime.sendMessage({
         type: 'apiRequest',
@@ -464,18 +498,24 @@
         }
       }, (response) => {
         if (chrome.runtime.lastError) {
-          // Message error - fall back silently
+          console.log('[FlipRadar] AI extraction message error:', chrome.runtime.lastError);
           resolve(null);
           return;
         }
 
-        if (!response || !response.ok) {
-          // Endpoint may not exist yet - this is expected, fall back silently
+        if (!response) {
+          console.log('[FlipRadar] AI extraction - no response');
           resolve(null);
           return;
         }
 
-        console.log('[FlipRadar] AI extracted data:', response.data);
+        if (!response.ok) {
+          console.log('[FlipRadar] AI extraction failed:', response.status, response.error || response.data?.error);
+          resolve(null);
+          return;
+        }
+
+        console.log('[FlipRadar] AI extraction successful:', response.data);
         resolve(response.data);
       });
     });
@@ -1254,11 +1294,11 @@
     const itemId = getItemId();
     console.log('[FlipRadar] initOverlay called for:', currentPageUrl, 'itemId:', itemId);
 
-    // Get the previous title to detect when content changes
-    const previousTitle = lastExtractedData?.title || null;
+    // Show loading overlay immediately
+    createLoadingOverlay({ title: 'Loading...', itemId });
 
-    // Wait for content to actually change (or timeout after 5s)
-    await waitForNewContent(previousTitle, itemId, 5000);
+    // Brief wait for Facebook DOM to settle (SPA navigation)
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Verify URL hasn't changed during wait
     if (window.location.href !== currentPageUrl) {
@@ -1267,23 +1307,45 @@
     }
 
     let data;
+    let extractionMethod = 'none';
 
-    // Try AI extraction first (more reliable)
-    const aiData = await extractWithAI();
-    if (aiData && (aiData.title || aiData.price)) {
-      console.log('[FlipRadar] Using AI extracted data');
-      data = {
-        title: aiData.title || null,
-        price: aiData.price || null,
-        location: aiData.location || null,
-        seller: aiData.seller || null,
-        daysListed: aiData.daysListed || null,
-        imageUrl: extractors.getImageUrl(),
-        itemId: itemId
-      };
-    } else {
-      // Fall back to DOM extraction
-      console.log('[FlipRadar] Falling back to DOM extraction');
+    // PRIMARY: Try AI extraction first (most reliable, resilient to DOM changes)
+    if (authToken) {
+      console.log('[FlipRadar] Attempting AI extraction (primary method)...');
+      const aiData = await extractWithAI();
+
+      if (aiData && (aiData.title || aiData.price)) {
+        extractionMethod = 'ai';
+        data = {
+          title: aiData.title || null,
+          price: typeof aiData.price === 'number' ? aiData.price : parsePrice(aiData.price),
+          location: aiData.location || null,
+          seller: aiData.seller || null,
+          daysListed: aiData.daysListed || null,
+          imageUrl: extractors.getImageUrl(),
+          itemId: itemId
+        };
+        console.log('[FlipRadar] AI extraction successful:', data.title);
+      } else {
+        console.log('[FlipRadar] AI extraction returned no usable data');
+      }
+    }
+
+    // FALLBACK: DOM extraction if AI failed or user not logged in
+    if (!data || (!data.title && !data.price)) {
+      console.log('[FlipRadar] Using DOM extraction (fallback)...');
+      extractionMethod = 'dom';
+
+      // Wait for content to be ready
+      const previousTitle = lastExtractedData?.title || null;
+      await waitForNewContent(previousTitle, itemId, 4000);
+
+      // Verify URL still matches
+      if (window.location.href !== currentPageUrl) {
+        console.log('[FlipRadar] URL changed during DOM wait, aborting');
+        return;
+      }
+
       data = {
         title: extractors.getTitle(),
         price: extractors.getPrice(),
@@ -1293,21 +1355,23 @@
         imageUrl: extractors.getImageUrl(),
         itemId: itemId
       };
+      console.log('[FlipRadar] DOM extraction result:', data.title);
     }
 
     // Store for next comparison
     lastExtractedData = data;
 
-    console.log('[FlipRadar] Final extracted data for', currentPageUrl, ':', data);
+    console.log('[FlipRadar] Final data (method: ' + extractionMethod + '):', data);
 
     if (!data.title && !data.price) {
       console.log('[FlipRadar] Could not extract listing data');
+      // Show error in overlay
+      await createOverlay({ title: null, price: null, itemId }, null);
       return;
     }
 
-    // Show loading overlay if logged in
+    // Fetch eBay price data if logged in
     if (authToken && data.title) {
-      createLoadingOverlay(data);
       const priceData = await fetchPriceData(data.title);
       await createOverlay(data, priceData);
     } else {
@@ -1325,8 +1389,16 @@
   function handleNavigation() {
     console.log('[FlipRadar] Navigation detected:', window.location.href);
     if (isMarketplaceItemPage()) {
-      // DON'T clear lastExtractedData - we need it to detect when DOM actually updates
-      // waitForNewContent() uses previousTitle to know when content has changed
+      const newItemId = getItemId();
+      const previousItemId = lastExtractedData?.itemId;
+
+      // If navigating to a DIFFERENT item, clear cached data
+      // This ensures we wait for any valid title without comparing to old item's data
+      if (newItemId !== previousItemId) {
+        console.log('[FlipRadar] New item detected, clearing cache. Previous:', previousItemId, 'New:', newItemId);
+        lastExtractedData = null;
+      }
+
       showTriggerButton();
     } else {
       // Remove button/overlay when leaving marketplace item
@@ -1376,6 +1448,13 @@
           lastUrl = window.location.href;
 
           if (isMarketplaceItemPage()) {
+            // Clear cached data when navigating to a different item
+            const newItemId = getItemId();
+            const previousItemId = lastExtractedData?.itemId;
+            if (newItemId !== previousItemId) {
+              console.log('[FlipRadar] Observer: New item detected, clearing cache');
+              lastExtractedData = null;
+            }
             showTriggerButton();
           } else {
             // Remove trigger button and overlay when navigating away
@@ -1426,8 +1505,8 @@
   function showTriggerButton() {
     console.log('[FlipRadar] showTriggerButton called for URL:', window.location.href);
 
-    // DON'T clear lastExtractedData here - we need it to detect when content actually changes
-    // The item ID validation will catch any stale data
+    // Note: lastExtractedData is cleared by handleNavigation() when item ID changes
+    // This ensures waitForNewContent waits for any valid title on new items
 
     // Always remove existing overlay when showing button for a new item
     const existingOverlay = document.getElementById(OVERLAY_ID);

@@ -1,0 +1,14 @@
+{
+  "name": "flipradar-extension",
+  "version": "1.3.0",
+  "private": true,
+  "description": "FlipRadar Chrome Extension - Compare Facebook Marketplace prices to eBay sold listings",
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "watch": "node esbuild.config.js --watch",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  }
+}
