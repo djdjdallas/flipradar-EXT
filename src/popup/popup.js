@@ -155,6 +155,19 @@ function setupEventListeners() {
     chrome.tabs.create({ url: `${API_BASE_URL}/dashboard/settings` });
   });
 
+  // Event delegation for delete buttons (handles both cloud and local deals)
+  document.getElementById('deals-container').addEventListener('click', (e) => {
+    const deleteBtn = e.target.closest('.deal-btn-delete');
+    if (!deleteBtn) return;
+    const dealId = deleteBtn.dataset.id;
+    if (!dealId) return;
+    if (currentTab === 'cloud' && authToken) {
+      deleteCloudDeal(dealId);
+    } else {
+      deleteLocalDeal(dealId);
+    }
+  });
+
   // Listen for auth success
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'authSuccess') {
@@ -323,14 +336,6 @@ function renderCloudDeals(deals) {
 
   const dealsHtml = deals.map(deal => createCloudDealCard(deal)).join('');
   container.innerHTML = `<div class="deals-list">${dealsHtml}</div>`;
-
-  // Add delete button listeners
-  container.querySelectorAll('.deal-btn-delete').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const dealId = e.target.dataset.id;
-      deleteCloudDeal(dealId);
-    });
-  });
 }
 
 function renderLocalDeals(deals) {
@@ -349,19 +354,12 @@ function renderLocalDeals(deals) {
 
   const dealsHtml = deals.map(deal => createLocalDealCard(deal)).join('');
   container.innerHTML = `<div class="deals-list">${dealsHtml}</div>`;
-
-  // Add delete button listeners
-  container.querySelectorAll('.deal-btn-delete').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const dealId = e.target.dataset.id;
-      deleteLocalDeal(dealId);
-    });
-  });
 }
 
 function createCloudDealCard(deal) {
-  const price = deal.user_asking_price ? `$${deal.user_asking_price.toLocaleString()}` : 'N/A';
-  const date = formatDate(deal.created_at);
+  const numericPrice = Number(deal.user_asking_price);
+  const price = !isNaN(numericPrice) && numericPrice > 0 ? `$${numericPrice.toLocaleString()}` : 'N/A';
+  const date = escapeHtml(formatDate(deal.created_at));
 
   // Calculate profit if we have eBay data
   let profitHtml = '';
@@ -395,8 +393,9 @@ function createCloudDealCard(deal) {
 }
 
 function createLocalDealCard(deal) {
-  const price = deal.price ? `$${deal.price.toLocaleString()}` : 'N/A';
-  const date = formatDate(deal.savedAt);
+  const numericPrice = Number(deal.price);
+  const price = !isNaN(numericPrice) && numericPrice > 0 ? `$${numericPrice.toLocaleString()}` : 'N/A';
+  const date = escapeHtml(formatDate(deal.savedAt));
 
   return `
     <div class="deal-card" data-id="${escapeHtml(String(deal.id))}">

@@ -10,7 +10,7 @@ import {
   isJobCurrent,
   endJob
 } from './state.js';
-import { initNavigation, onNavigation, isMarketplaceItemUrl } from './navigation.js';
+import { initNavigation, cleanupNavigation, onNavigation, isMarketplaceItemUrl } from './navigation.js';
 import { setupNetworkInterception, getInterceptedData } from './networkInterceptor.js';
 import {
   getItemId,
@@ -75,9 +75,9 @@ async function extractData(jobId, itemId) {
   if (!data || (!data.title && !data.price)) {
     console.log('[FlipRadar] Using DOM extraction (fallback)...');
 
-    // Wait for content to be ready
+    // Wait for content to be ready (pass jobId for self-cancellation)
     const previousTitle = getLastExtractedData()?.title || null;
-    await waitForNewContent(previousTitle, itemId);
+    await waitForNewContent(previousTitle, itemId, undefined, jobId);
 
     // Check job still current after waiting
     if (!isJobCurrent(jobId)) {
@@ -176,10 +176,21 @@ function handleMarketplaceNavigation(url, itemId) {
   });
 }
 
+// Track init state and cleanup functions
+let initialized = false;
+let cleanupAuthListener = null;
+let cleanupSoldDataListener = null;
+
 /**
  * Main initialization
  */
 function init() {
+  if (initialized) {
+    console.log('[FlipRadar] Already initialized, skipping');
+    return;
+  }
+  initialized = true;
+
   console.log('[FlipRadar] Content script loaded on:', window.location.href);
   console.log('[FlipRadar] Is marketplace item page:', isMarketplaceItemPage());
 
@@ -196,8 +207,16 @@ function init() {
     }
   });
 
+  // Clean up previous listeners if they exist (defensive)
+  if (cleanupAuthListener) {
+    cleanupAuthListener();
+  }
+  if (cleanupSoldDataListener) {
+    cleanupSoldDataListener();
+  }
+
   // Listen for auth success - refresh overlay if on marketplace page
-  onAuthSuccess(() => {
+  cleanupAuthListener = onAuthSuccess(() => {
     console.log('[FlipRadar] Auth success, checking if should refresh overlay');
     if (isMarketplaceItemPage()) {
       initOverlay();
@@ -205,7 +224,7 @@ function init() {
   });
 
   // Listen for sold data from eBay reader - refresh overlay if visible
-  onSoldDataReceived((soldData) => {
+  cleanupSoldDataListener = onSoldDataReceived((soldData) => {
     console.log('[FlipRadar] Received sold data, checking if should refresh overlay');
     const overlay = document.getElementById('flipradar-overlay');
     if (overlay && isMarketplaceItemPage()) {

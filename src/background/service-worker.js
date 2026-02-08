@@ -11,17 +11,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       url: `${API_BASE_URL}/auth/extension`
     });
     sendResponse({ success: true });
-  }
-
-  if (message.type === 'openUpgrade') {
+  } else if (message.type === 'openUpgrade') {
     // Open pricing page in new tab
     chrome.tabs.create({
       url: `${API_BASE_URL}/pricing`
     });
     sendResponse({ success: true });
-  }
-
-  if (message.type === 'getAuthToken') {
+  } else if (message.type === 'getAuthToken') {
     // Return stored auth token
     chrome.storage.local.get(['authToken', 'user'], (result) => {
       sendResponse({
@@ -30,22 +26,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     });
     return true; // Keep channel open for async response
-  }
-
-  if (message.type === 'logout') {
+  } else if (message.type === 'logout') {
     // Clear auth data
     chrome.storage.local.remove(['authToken', 'user'], () => {
       sendResponse({ success: true });
     });
     return true;
-  }
-
-  if (message.type === 'getApiBaseUrl') {
+  } else if (message.type === 'getApiBaseUrl') {
     sendResponse({ url: API_BASE_URL });
-  }
-
-  // Relay sold data capture events from eBay tabs to FB Marketplace tabs
-  if (message.type === 'soldDataCaptured') {
+  } else if (message.type === 'soldDataCaptured') {
+    // Relay sold data capture events from eBay tabs to FB Marketplace tabs
     chrome.tabs.query({ url: '*://www.facebook.com/marketplace/*' }, (tabs) => {
       tabs.forEach(tab => {
         chrome.tabs.sendMessage(tab.id, {
@@ -55,17 +45,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     });
     sendResponse({ success: true });
-  }
+  } else if (message.type === 'apiRequest') {
+    // Proxy API requests from content scripts to bypass CORS
+    // Only allow requests to our own API
+    if (!message.url || !message.url.startsWith(API_BASE_URL)) {
+      console.warn('[FlipRadar] API proxy blocked request to non-API URL:', message.url);
+      sendResponse({
+        ok: false,
+        status: 0,
+        error: 'URL not allowed'
+      });
+      return true;
+    }
 
-  // Proxy API requests from content scripts to bypass CORS
-  // Content scripts run in page context, so requests appear from page origin
-  // Background script can make requests without CORS restrictions
-  if (message.type === 'apiRequest') {
     (async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       try {
         const fetchOptions = {
           method: message.method || 'GET',
-          headers: message.headers || {}
+          headers: message.headers || {},
+          signal: controller.signal
         };
 
         // Only add body for non-GET requests
@@ -79,7 +80,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         let data;
         try {
           data = await response.json();
-        } catch {
+        } catch (jsonError) {
+          console.warn('[FlipRadar] API proxy: failed to parse JSON response:', jsonError.message);
           data = null;
         }
 
@@ -93,8 +95,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: false,
           status: 0,
-          error: error.message
+          error: error.name === 'AbortError' ? 'Request timed out' : error.message
         });
+      } finally {
+        clearTimeout(timeoutId);
       }
     })();
     return true; // Keep channel open for async response
@@ -106,6 +110,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Listen for tab updates to catch auth callback
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url && changeInfo.url.includes('/auth/extension/callback')) {
+    // Validate the callback URL origin matches our API
+    try {
+      const urlObj = new URL(changeInfo.url);
+      const apiOrigin = new URL(API_BASE_URL).origin;
+      if (urlObj.origin !== apiOrigin) {
+        console.warn('[FlipRadar] Auth callback blocked from unexpected origin:', urlObj.origin);
+        return;
+      }
+    } catch {
+      console.warn('[FlipRadar] Auth callback URL parse failed:', changeInfo.url);
+      return;
+    }
     handleAuthCallback(changeInfo.url, tabId);
   }
 });

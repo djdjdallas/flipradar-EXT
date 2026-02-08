@@ -8,6 +8,8 @@ import { clearLastExtractedData, getLastExtractedData } from './state.js';
 // Track current URL for change detection
 let lastUrl = typeof window !== 'undefined' ? window.location.href : '';
 let debounceTimeout = null;
+let currentObserver = null;
+let navigationInitialized = false;
 
 // Registered navigation callbacks
 const navigationCallbacks = [];
@@ -124,6 +126,12 @@ export function setupHistoryListener() {
  * @returns {MutationObserver}
  */
 export function setupNavigationObserver() {
+  // Disconnect any previous observer to prevent duplicates
+  if (currentObserver) {
+    currentObserver.disconnect();
+    currentObserver = null;
+  }
+
   const observer = new MutationObserver(() => {
     // Debounce navigation checks to avoid excessive processing
     if (debounceTimeout) {
@@ -143,14 +151,35 @@ export function setupNavigationObserver() {
     subtree: true
   });
 
+  currentObserver = observer;
   console.log('[FlipRadar] MutationObserver backup installed');
   return observer;
+}
+
+/**
+ * Clean up navigation detection (disconnect observer)
+ */
+export function cleanupNavigation() {
+  if (currentObserver) {
+    currentObserver.disconnect();
+    currentObserver = null;
+  }
+  if (debounceTimeout) {
+    clearTimeout(debounceTimeout);
+    debounceTimeout = null;
+  }
+  navigationInitialized = false;
 }
 
 /**
  * Initialize all navigation detection mechanisms
  */
 export function initNavigation() {
+  if (navigationInitialized) {
+    console.log('[FlipRadar] Navigation already initialized, skipping');
+    return;
+  }
+  navigationInitialized = true;
   lastUrl = window.location.href;
   setupHistoryListener();
   setupNavigationObserver();

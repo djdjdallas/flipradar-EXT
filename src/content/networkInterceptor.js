@@ -99,7 +99,7 @@ function parseGraphQLResponse(response) {
 
     return null;
   } catch (e) {
-    // JSON parse error or structure mismatch
+    console.warn('[FlipRadar] GraphQL parse error:', e.message);
     return null;
   }
 }
@@ -157,7 +157,11 @@ export function setupNetworkInterception() {
                 url: url,
                 data: data
               }, '*');
-            }).catch(() => {});
+            }).catch(function(err) {
+              if (err && err.name !== 'AbortError') {
+                console.warn('[FlipRadar] Fetch intercept parse error:', err.message);
+              }
+            });
           }
         } catch (e) {
           // Silently fail - don't break page functionality
@@ -173,22 +177,25 @@ export function setupNetworkInterception() {
       };
 
       XMLHttpRequest.prototype.send = function(...args) {
-        this.addEventListener('load', function() {
-          try {
-            const url = this._flipradarUrl;
-            if (url && (url.includes('/api/graphql') || url.includes('/graphql'))) {
-              const data = JSON.parse(this.responseText);
-              window.postMessage({
-                type: 'FLIPRADAR_GRAPHQL_RESPONSE',
-                source: 'xhr',
-                url: url,
-                data: data
-              }, '*');
+        if (!this._flipradarListenerAdded) {
+          this._flipradarListenerAdded = true;
+          this.addEventListener('load', function() {
+            try {
+              const url = this._flipradarUrl;
+              if (url && (url.includes('/api/graphql') || url.includes('/graphql'))) {
+                const data = JSON.parse(this.responseText);
+                window.postMessage({
+                  type: 'FLIPRADAR_GRAPHQL_RESPONSE',
+                  source: 'xhr',
+                  url: url,
+                  data: data
+                }, '*');
+              }
+            } catch (e) {
+              // Silently fail - don't break page functionality
             }
-          } catch (e) {
-            // Silently fail
-          }
-        });
+          });
+        }
         return originalXHRSend.apply(this, args);
       };
 

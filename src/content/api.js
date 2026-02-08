@@ -145,8 +145,13 @@ export function saveDealLocally(data) {
     if (deals.length > MAX_LOCAL_DEALS) {
       deals.pop();
     }
-    chrome.storage.local.set({ savedDeals: deals });
-    console.log('[FlipRadar] Deal saved locally');
+    chrome.storage.local.set({ savedDeals: deals }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[FlipRadar] Failed to save deal locally:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[FlipRadar] Deal saved locally');
+      }
+    });
   });
 }
 
@@ -193,11 +198,11 @@ export async function getStoredSoldData(title) {
           titleWords.some(tw => tw.includes(w) || w.includes(tw))
         );
 
-        // Require at least 50% word overlap for fuzzy match
+        // Require at least 60% word overlap and 3 overlapping words for fuzzy match
         const overlapRatio = titleWords.length > 0 ? overlap.length / titleWords.length : 0;
         console.log('[FlipRadar] Fuzzy match check - overlap:', overlap.length, 'ratio:', overlapRatio);
 
-        if (overlapRatio >= 0.5 && overlap.length >= 2) {
+        if (overlapRatio >= 0.6 && overlap.length >= 3) {
           console.log('[FlipRadar] Using fuzzy matched sold data');
           resolve(result.flipradar_last_sold);
           return;

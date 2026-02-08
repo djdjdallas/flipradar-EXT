@@ -22,7 +22,7 @@ import {
   PRICE_MIN_FONT_SIZE
 } from './config.js';
 
-import { getLastExtractedData } from './state.js';
+import { getLastExtractedData, isJobCurrent } from './state.js';
 import { isGenericTitle, isValidProductTitle } from './utils/filters.js';
 import { getFontSize, getMainContent } from './utils/dom.js';
 import { parsePrice } from './utils/pricing.js';
@@ -51,9 +51,10 @@ export function isMarketplaceItemPage() {
  * @param {string|null} previousTitle - Previous item's title (for comparison)
  * @param {string} currentItemId - Current item ID from URL
  * @param {number} timeout - Maximum wait time in ms
- * @returns {Promise<boolean>} - True if new content detected, false if timeout
+ * @param {string|null} jobId - Job ID for cancellation (if provided, polling stops when job is no longer current)
+ * @returns {Promise<boolean>} - True if new content detected, false if timeout or cancelled
  */
-export function waitForNewContent(previousTitle, currentItemId, timeout = CONTENT_WAIT_TIMEOUT_MS) {
+export function waitForNewContent(previousTitle, currentItemId, timeout = CONTENT_WAIT_TIMEOUT_MS, jobId = null) {
   return new Promise((resolve) => {
     const startTime = Date.now();
     const lastData = getLastExtractedData();
@@ -66,6 +67,13 @@ export function waitForNewContent(previousTitle, currentItemId, timeout = CONTEN
     }
 
     const check = () => {
+      // Self-cancel if the job is no longer current
+      if (jobId && !isJobCurrent(jobId)) {
+        console.log('[FlipRadar] waitForNewContent cancelled — job no longer current');
+        resolve(false);
+        return;
+      }
+
       const currentTitle = extractTitle();
       const elapsed = Date.now() - startTime;
       const isGeneric = isGenericTitle(currentTitle);

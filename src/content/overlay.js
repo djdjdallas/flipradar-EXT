@@ -413,7 +413,7 @@ export async function createOverlay(data, priceData = null) {
             ${soldData.samples.slice(0, 3).map(s => `
               <div class="sample-item">
                 <span>${escapeHtml(s.title.substring(0, 25))}...</span>
-                <span class="sample-price">$${s.price}</span>
+                <span class="sample-price">$${Number(s.price) || 0}</span>
               </div>
             `).join('')}
           </div>
@@ -451,7 +451,7 @@ export async function createOverlay(data, priceData = null) {
             ${priceData.samples.slice(0, 3).map(s => `
               <div class="sample-item">
                 <span>${escapeHtml(s.title.substring(0, 30))}...</span>
-                <span class="sample-price">$${s.price}</span>
+                <span class="sample-price">$${Number(s.price) || 0}</span>
               </div>
             `).join('')}
           </div>
