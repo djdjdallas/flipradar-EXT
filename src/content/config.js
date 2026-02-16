@@ -5,7 +5,7 @@ export const OVERLAY_ID = 'flipradar-overlay';
 export const TRIGGER_BUTTON_ID = 'flipradar-trigger';
 
 // API Configuration
-export const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
+export const API_BASE_URL = 'https://flipradar.vercel.app';
 
 // Cache Configuration
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours

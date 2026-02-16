@@ -1,7 +1,7 @@
 // FlipRadar - Background Service Worker
 
 // API base URL
-const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
+const API_BASE_URL = 'https://flipradar.vercel.app';
 
 // Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

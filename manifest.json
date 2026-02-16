@@ -13,7 +13,7 @@
     "<all_urls>",
     "*://www.facebook.com/*",
     "*://www.ebay.com/*",
-    "*://flipradar-iaxg.vercel.app/*"
+    "*://flipradar.vercel.app/*"
   ],
   "action": {
     "default_popup": "popup.html",
