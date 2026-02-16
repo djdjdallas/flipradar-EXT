@@ -86,6 +86,9 @@ export async function extractWithVision() {
         return;
       }
 
+      if (response.data?.error) {
+        console.log('[FlipRadar] Vision extraction API error:', response.data.error);
+      }
       console.log('[FlipRadar] Vision extraction successful:', response.data);
       resolve(response.data);
     });
