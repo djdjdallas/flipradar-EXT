@@ -10,6 +10,7 @@
     "alarms"
   ],
   "host_permissions": [
+    "<all_urls>",
     "*://www.facebook.com/*",
     "*://www.ebay.com/*",
     "*://flipradar-iaxg.vercel.app/*"
