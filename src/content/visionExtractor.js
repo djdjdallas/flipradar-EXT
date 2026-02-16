@@ -1,0 +1,114 @@
+// FlipRadar Vision Extraction
+// Uses screenshot + Gemini Vision to extract listing data
+// DOM-agnostic — resilient to Facebook layout changes
+
+import { API_BASE_URL } from './config.js';
+import { getAuthToken } from './state.js';
+import { parsePrice } from './utils/pricing.js';
+import { extractImageUrl } from './scraper.js';
+
+/**
+ * Capture a screenshot of the visible tab via the service worker
+ * @returns {Promise<string|null>} - Base64 JPEG data (no prefix) or null on failure
+ */
+function captureScreenshot() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'captureScreenshot' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('[FlipRadar] Screenshot capture error:', chrome.runtime.lastError);
+        resolve(null);
+        return;
+      }
+
+      if (!response || !response.success) {
+        console.log('[FlipRadar] Screenshot capture failed:', response?.error);
+        resolve(null);
+        return;
+      }
+
+      resolve(response.screenshot);
+    });
+  });
+}
+
+/**
+ * Extract listing data using screenshot + Gemini Vision
+ * Captures the visible tab and sends to the vision-extract API
+ *
+ * @returns {Promise<object|null>} - Extracted data or null if failed
+ */
+export async function extractWithVision() {
+  const authToken = getAuthToken();
+
+  if (!authToken) {
+    console.log('[FlipRadar] Vision extraction skipped - not logged in');
+    return null;
+  }
+
+  // Capture screenshot
+  const screenshot = await captureScreenshot();
+  if (!screenshot) {
+    console.log('[FlipRadar] Vision extraction skipped - screenshot capture failed');
+    return null;
+  }
+
+  console.log('[FlipRadar] Sending screenshot to vision extraction (' + Math.round(screenshot.length / 1024) + ' KB)');
+
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({
+      type: 'apiRequest',
+      url: `${API_BASE_URL}/api/vision-extract`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: {
+        screenshot,
+        url: window.location.href
+      }
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('[FlipRadar] Vision extraction message error:', chrome.runtime.lastError);
+        resolve(null);
+        return;
+      }
+
+      if (!response) {
+        console.log('[FlipRadar] Vision extraction - no response');
+        resolve(null);
+        return;
+      }
+
+      if (!response.ok) {
+        console.log('[FlipRadar] Vision extraction failed:', response.status, response.error || response.data?.error);
+        resolve(null);
+        return;
+      }
+
+      console.log('[FlipRadar] Vision extraction successful:', response.data);
+      resolve(response.data);
+    });
+  });
+}
+
+/**
+ * Transform vision extraction result to standard data format
+ * Normalizes the vision response to match our internal data structure
+ *
+ * @param {object} visionData - Raw vision extraction result
+ * @param {string} itemId - Current item ID
+ * @returns {object} - Normalized listing data
+ */
+export function transformVisionData(visionData, itemId) {
+  return {
+    title: visionData.title || null,
+    price: typeof visionData.price === 'number' ? visionData.price : parsePrice(visionData.price),
+    location: visionData.location || null,
+    seller: visionData.seller || null,
+    daysListed: visionData.daysListed || null,
+    imageUrl: extractImageUrl(), // Vision doesn't extract images, get from DOM
+    itemId: itemId,
+    source: 'vision'
+  };
+}

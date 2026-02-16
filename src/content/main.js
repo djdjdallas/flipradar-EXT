@@ -19,6 +19,7 @@ import {
   extractAllData
 } from './scraper.js';
 import { extractWithAI, transformAIData } from './aiExtractor.js';
+import { extractWithVision, transformVisionData } from './visionExtractor.js';
 import { fetchPriceData } from './api.js';
 import { initAuth, onAuthSuccess, onSoldDataReceived, isLoggedIn } from './auth.js';
 import { createOverlay, createLoadingOverlay, showTriggerButton } from './overlay.js';
@@ -26,8 +27,9 @@ import { createOverlay, createLoadingOverlay, showTriggerButton } from './overla
 /**
  * Data extraction cascade:
  * 1. GraphQL (intercepted) - fastest, most reliable when available
- * 2. AI extraction - resilient to DOM changes, uses backend AI
- * 3. DOM scraping - fallback using tiered selectors
+ * 2. Vision (screenshot + Gemini) - DOM-agnostic, resilient to layout changes
+ * 3. AI text extraction (Claude) - resilient to DOM changes, uses backend AI
+ * 4. DOM scraping - fallback using tiered selectors
  *
  * @param {string} jobId - Current job ID for race condition checking
  * @param {string} itemId - Facebook item ID
@@ -51,7 +53,27 @@ async function extractData(jobId, itemId) {
     method = 'graphql';
   }
 
-  // Tier 2: Try AI extraction if logged in and no GraphQL data
+  // Tier 2: Try vision extraction (screenshot + Gemini) if logged in and no GraphQL data
+  if (!data && isLoggedIn()) {
+    console.log('[FlipRadar] Attempting vision extraction...');
+    const visionData = await extractWithVision();
+
+    // Check job still current after async operation
+    if (!isJobCurrent(jobId)) {
+      console.log('[FlipRadar] Job cancelled during vision extraction');
+      return null;
+    }
+
+    if (visionData && (visionData.title || visionData.price)) {
+      data = transformVisionData(visionData, itemId);
+      method = 'vision';
+      console.log('[FlipRadar] Vision extraction successful:', data.title);
+    } else {
+      console.log('[FlipRadar] Vision extraction returned no usable data');
+    }
+  }
+
+  // Tier 3: Try AI text extraction if logged in and no data yet
   if (!data && isLoggedIn()) {
     console.log('[FlipRadar] Attempting AI extraction...');
     const aiData = await extractWithAI();
@@ -71,7 +93,7 @@ async function extractData(jobId, itemId) {
     }
   }
 
-  // Tier 3: DOM extraction fallback
+  // Tier 4: DOM extraction fallback
   if (!data || (!data.title && !data.price)) {
     console.log('[FlipRadar] Using DOM extraction (fallback)...');
 

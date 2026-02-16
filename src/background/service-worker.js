@@ -45,6 +45,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     });
     sendResponse({ success: true });
+  } else if (message.type === 'captureScreenshot') {
+    // Capture visible tab as JPEG screenshot for vision extraction
+    chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 80 }, (dataUrl) => {
+      if (chrome.runtime.lastError) {
+        console.error('[FlipRadar] Screenshot capture error:', chrome.runtime.lastError);
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+        return;
+      }
+
+      // Strip the data URL prefix to get raw base64
+      const base64Data = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+      sendResponse({ success: true, screenshot: base64Data });
+    });
+    return true; // Keep channel open for async response
   } else if (message.type === 'apiRequest') {
     // Proxy API requests from content scripts to bypass CORS
     // Only allow requests to our own API
