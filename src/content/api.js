@@ -1,5 +1,5 @@
-// FlipRadar API Communication
-// Handles all API calls to the FlipRadar backend via the background service worker
+// FlipChecker API Communication
+// Handles all API calls to the FlipChecker backend via the background service worker
 
 import { API_BASE_URL, MAX_LOCAL_DEALS, CACHE_TTL_MS } from './config.js';
 import { getAuthToken } from './state.js';
@@ -29,7 +29,7 @@ export async function fetchPriceData(title) {
       body: { title }
     }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error('[FlipRadar] Price lookup message error:', chrome.runtime.lastError);
+        console.error('[FlipChecker] Price lookup message error:', chrome.runtime.lastError);
         resolve({ error: 'network_error' });
         return;
       }
@@ -95,7 +95,7 @@ export async function saveDealToApi(data, priceData) {
       }
     }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error('[FlipRadar] Save deal message error:', chrome.runtime.lastError);
+        console.error('[FlipChecker] Save deal message error:', chrome.runtime.lastError);
         saveDealLocally(data);
         resolve({ success: true, local: true });
         return;
@@ -113,13 +113,13 @@ export async function saveDealToApi(data, priceData) {
           return;
         }
 
-        console.error('[FlipRadar] API save failed:', response?.error || response?.status);
+        console.error('[FlipChecker] API save failed:', response?.error || response?.status);
         saveDealLocally(data);
         resolve({ success: true, local: true });
         return;
       }
 
-      console.log('[FlipRadar] Deal saved to cloud successfully');
+      console.log('[FlipChecker] Deal saved to cloud successfully');
       resolve({ success: true });
     });
   });
@@ -147,9 +147,9 @@ export function saveDealLocally(data) {
     }
     chrome.storage.local.set({ savedDeals: deals }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[FlipRadar] Failed to save deal locally:', chrome.runtime.lastError.message);
+        console.error('[FlipChecker] Failed to save deal locally:', chrome.runtime.lastError.message);
       } else {
-        console.log('[FlipRadar] Deal saved locally');
+        console.log('[FlipChecker] Deal saved locally');
       }
     });
   });
@@ -174,21 +174,21 @@ export async function getStoredSoldData(title) {
       .replace(/\s+/g, '_')
       .substring(0, 50);
 
-    const storageKey = `flipradar_sold_${queryKey}`;
+    const storageKey = `flipchecker_sold_${queryKey}`;
 
     // Try exact match first, then fall back to last lookup
-    chrome.storage.local.get([storageKey, 'flipradar_last_sold'], (result) => {
+    chrome.storage.local.get([storageKey, 'flipchecker_last_sold'], (result) => {
       // Check if we have an exact match
       if (result[storageKey] && isDataFresh(result[storageKey].timestamp, CACHE_TTL_MS)) {
-        console.log('[FlipRadar] Found exact match for sold data');
+        console.log('[FlipChecker] Found exact match for sold data');
         resolve(result[storageKey]);
         return;
       }
 
       // Check if last lookup is relevant (fuzzy match on query)
       // Only use if there's very strong overlap to avoid showing wrong data
-      if (result.flipradar_last_sold && isDataFresh(result.flipradar_last_sold.timestamp, CACHE_TTL_MS)) {
-        const lastQuery = result.flipradar_last_sold.query.toLowerCase();
+      if (result.flipchecker_last_sold && isDataFresh(result.flipchecker_last_sold.timestamp, CACHE_TTL_MS)) {
+        const lastQuery = result.flipchecker_last_sold.query.toLowerCase();
         const currentTitle = title.toLowerCase();
 
         // Check if there's meaningful overlap - require stronger match
@@ -200,11 +200,11 @@ export async function getStoredSoldData(title) {
 
         // Require at least 60% word overlap and 3 overlapping words for fuzzy match
         const overlapRatio = titleWords.length > 0 ? overlap.length / titleWords.length : 0;
-        console.log('[FlipRadar] Fuzzy match check - overlap:', overlap.length, 'ratio:', overlapRatio);
+        console.log('[FlipChecker] Fuzzy match check - overlap:', overlap.length, 'ratio:', overlapRatio);
 
         if (overlapRatio >= 0.6 && overlap.length >= 3) {
-          console.log('[FlipRadar] Using fuzzy matched sold data');
-          resolve(result.flipradar_last_sold);
+          console.log('[FlipChecker] Using fuzzy matched sold data');
+          resolve(result.flipchecker_last_sold);
           return;
         }
       }

@@ -1,4 +1,4 @@
-// FlipRadar Network Interception
+// FlipChecker Network Interception
 // Intercepts fetch/XHR requests to capture GraphQL responses containing listing data
 // This provides data faster and more reliably than DOM scraping when available
 
@@ -99,7 +99,7 @@ function parseGraphQLResponse(response) {
 
     return null;
   } catch (e) {
-    console.warn('[FlipRadar] GraphQL parse error:', e.message);
+    console.warn('[FlipChecker] GraphQL parse error:', e.message);
     return null;
   }
 }
@@ -110,14 +110,14 @@ function parseGraphQLResponse(response) {
  * @param {object} data
  */
 function handleInterceptedData(itemId, data) {
-  console.log('[FlipRadar] Intercepted GraphQL data for item:', itemId);
+  console.log('[FlipChecker] Intercepted GraphQL data for item:', itemId);
   interceptedData.set(itemId, data);
 
   dataCallbacks.forEach(cb => {
     try {
       cb(itemId, data);
     } catch (e) {
-      console.error('[FlipRadar] Data callback error:', e);
+      console.error('[FlipChecker] Data callback error:', e);
     }
   });
 }
@@ -133,8 +133,8 @@ export function setupNetworkInterception() {
   script.textContent = `
     (function() {
       // Only install once
-      if (window.__flipradarInterceptorInstalled) return;
-      window.__flipradarInterceptorInstalled = true;
+      if (window.__flipcheckerInterceptorInstalled) return;
+      window.__flipcheckerInterceptorInstalled = true;
 
       const originalFetch = window.fetch;
       const originalXHROpen = XMLHttpRequest.prototype.open;
@@ -152,14 +152,14 @@ export function setupNetworkInterception() {
             const clone = response.clone();
             clone.json().then(data => {
               window.postMessage({
-                type: 'FLIPRADAR_GRAPHQL_RESPONSE',
+                type: 'FLIPCHECKER_GRAPHQL_RESPONSE',
                 source: 'fetch',
                 url: url,
                 data: data
               }, '*');
             }).catch(function(err) {
               if (err && err.name !== 'AbortError') {
-                console.warn('[FlipRadar] Fetch intercept parse error:', err.message);
+                console.warn('[FlipChecker] Fetch intercept parse error:', err.message);
               }
             });
           }
@@ -172,20 +172,20 @@ export function setupNetworkInterception() {
 
       // Intercept XMLHttpRequest
       XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-        this._flipradarUrl = url;
+        this._flipcheckerUrl = url;
         return originalXHROpen.apply(this, [method, url, ...rest]);
       };
 
       XMLHttpRequest.prototype.send = function(...args) {
-        if (!this._flipradarListenerAdded) {
-          this._flipradarListenerAdded = true;
+        if (!this._flipcheckerListenerAdded) {
+          this._flipcheckerListenerAdded = true;
           this.addEventListener('load', function() {
             try {
-              const url = this._flipradarUrl;
+              const url = this._flipcheckerUrl;
               if (url && (url.includes('/api/graphql') || url.includes('/graphql'))) {
                 const data = JSON.parse(this.responseText);
                 window.postMessage({
-                  type: 'FLIPRADAR_GRAPHQL_RESPONSE',
+                  type: 'FLIPCHECKER_GRAPHQL_RESPONSE',
                   source: 'xhr',
                   url: url,
                   data: data
@@ -199,7 +199,7 @@ export function setupNetworkInterception() {
         return originalXHRSend.apply(this, args);
       };
 
-      console.log('[FlipRadar] Network interceptor installed in page context');
+      console.log('[FlipChecker] Network interceptor installed in page context');
     })();
   `;
 
@@ -213,7 +213,7 @@ export function setupNetworkInterception() {
     if (event.source !== window) return;
 
     // Check for our custom message type
-    if (event.data?.type === 'FLIPRADAR_GRAPHQL_RESPONSE') {
+    if (event.data?.type === 'FLIPCHECKER_GRAPHQL_RESPONSE') {
       const parsed = parseGraphQLResponse(event.data.data);
       if (parsed && parsed.itemId) {
         handleInterceptedData(parsed.itemId, parsed);
@@ -221,5 +221,5 @@ export function setupNetworkInterception() {
     }
   });
 
-  console.log('[FlipRadar] Network interception listener installed');
+  console.log('[FlipChecker] Network interception listener installed');
 }

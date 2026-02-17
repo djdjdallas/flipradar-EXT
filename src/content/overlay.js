@@ -1,4 +1,4 @@
-// FlipRadar Overlay UI
+// FlipChecker Overlay UI
 // Renders the flip analysis overlay with Shadow DOM isolation
 
 import { OVERLAY_ID, TRIGGER_BUTTON_ID, EBAY_FEE_MULTIPLIER } from './config.js';
@@ -306,7 +306,7 @@ export async function createOverlay(data, priceData = null) {
   // Verify we're still on the same item before showing overlay
   const currentItemId = getItemId();
   if (data.itemId && data.itemId !== currentItemId) {
-    console.log('[FlipRadar] Data item ID mismatch, aborting overlay. Expected:', data.itemId, 'Current:', currentItemId);
+    console.log('[FlipChecker] Data item ID mismatch, aborting overlay. Expected:', data.itemId, 'Current:', currentItemId);
     return;
   }
 
@@ -348,7 +348,7 @@ export async function createOverlay(data, priceData = null) {
     ${getOverlayStyles()}
     <div class="container">
       <div class="header">
-        <span class="logo">FlipRadar ${tierBadge}</span>
+        <span class="logo">FlipChecker ${tierBadge}</span>
         <button class="close-btn" id="close-overlay">&times;</button>
       </div>
 
@@ -628,7 +628,7 @@ export function createLoadingOverlay(data) {
     </style>
     <div class="container">
       <div class="header">
-        <span class="logo">FlipRadar</span>
+        <span class="logo">FlipChecker</span>
       </div>
       <div class="loading">
         <div class="spinner"></div>
@@ -646,18 +646,18 @@ export function createLoadingOverlay(data) {
  * @param {Function} onClick - Callback when button is clicked
  */
 export function showTriggerButton(onClick) {
-  console.log('[FlipRadar] showTriggerButton called for URL:', window.location.href);
+  console.log('[FlipChecker] showTriggerButton called for URL:', window.location.href);
 
   // Always remove existing overlay when showing button for a new item
   const existingOverlay = document.getElementById(OVERLAY_ID);
   if (existingOverlay) {
-    console.log('[FlipRadar] Removing old overlay');
+    console.log('[FlipChecker] Removing old overlay');
     existingOverlay.remove();
   }
 
   const existingBtn = document.getElementById(TRIGGER_BUTTON_ID);
   if (existingBtn) {
-    console.log('[FlipRadar] Removing old button');
+    console.log('[FlipChecker] Removing old button');
     existingBtn.remove();
   }
 
@@ -687,5 +687,5 @@ export function showTriggerButton(onClick) {
   });
 
   document.body.appendChild(btn);
-  console.log('[FlipRadar] Button added to page');
+  console.log('[FlipChecker] Button added to page');
 }

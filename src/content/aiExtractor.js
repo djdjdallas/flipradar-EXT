@@ -1,4 +1,4 @@
-// FlipRadar AI Extraction
+// FlipChecker AI Extraction
 // Uses backend AI service to extract listing data from page text
 // More resilient to DOM changes than direct scraping
 
@@ -18,14 +18,14 @@ export async function extractWithAI() {
   const authToken = getAuthToken();
 
   if (!authToken) {
-    console.log('[FlipRadar] AI extraction skipped - not logged in');
+    console.log('[FlipChecker] AI extraction skipped - not logged in');
     return null;
   }
 
   return new Promise((resolve) => {
     // Get page text content for AI analysis
     const pageText = getPageText(PAGE_TEXT_MAX_LENGTH);
-    console.log('[FlipRadar] Sending page text to AI extraction (' + pageText.length + ' chars)');
+    console.log('[FlipChecker] Sending page text to AI extraction (' + pageText.length + ' chars)');
 
     chrome.runtime.sendMessage({
       type: 'apiRequest',
@@ -41,24 +41,24 @@ export async function extractWithAI() {
       }
     }, (response) => {
       if (chrome.runtime.lastError) {
-        console.log('[FlipRadar] AI extraction message error:', chrome.runtime.lastError);
+        console.log('[FlipChecker] AI extraction message error:', chrome.runtime.lastError);
         resolve(null);
         return;
       }
 
       if (!response) {
-        console.log('[FlipRadar] AI extraction - no response');
+        console.log('[FlipChecker] AI extraction - no response');
         resolve(null);
         return;
       }
 
       if (!response.ok) {
-        console.log('[FlipRadar] AI extraction failed:', response.status, response.error || response.data?.error);
+        console.log('[FlipChecker] AI extraction failed:', response.status, response.error || response.data?.error);
         resolve(null);
         return;
       }
 
-      console.log('[FlipRadar] AI extraction successful:', response.data);
+      console.log('[FlipChecker] AI extraction successful:', response.data);
       resolve(response.data);
     });
   });

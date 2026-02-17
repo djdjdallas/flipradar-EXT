@@ -1,4 +1,4 @@
-// FlipRadar DOM Scraper
+// FlipChecker DOM Scraper
 // Extracts listing data from Facebook Marketplace DOM
 
 import {
@@ -61,7 +61,7 @@ export function waitForNewContent(previousTitle, currentItemId, timeout = CONTEN
 
     // If re-clicking same item with cached data, skip wait
     if (lastData?.itemId === currentItemId && lastData?.title) {
-      console.log('[FlipRadar] Same item, using cached title:', lastData.title);
+      console.log('[FlipChecker] Same item, using cached title:', lastData.title);
       resolve(true);
       return;
     }
@@ -69,7 +69,7 @@ export function waitForNewContent(previousTitle, currentItemId, timeout = CONTEN
     const check = () => {
       // Self-cancel if the job is no longer current
       if (jobId && !isJobCurrent(jobId)) {
-        console.log('[FlipRadar] waitForNewContent cancelled — job no longer current');
+        console.log('[FlipChecker] waitForNewContent cancelled — job no longer current');
         resolve(false);
         return;
       }
@@ -80,21 +80,21 @@ export function waitForNewContent(previousTitle, currentItemId, timeout = CONTEN
 
       // Content changed to a real title (different from previous)
       if (currentTitle && !isGeneric && currentTitle !== previousTitle && elapsed >= MIN_WAIT_MS) {
-        console.log('[FlipRadar] Content changed, new title:', currentTitle);
+        console.log('[FlipChecker] Content changed, new title:', currentTitle);
         resolve(true);
         return;
       }
 
       // First load - wait for any real title after minimum wait
       if (!previousTitle && currentTitle && !isGeneric && elapsed >= MIN_WAIT_MS) {
-        console.log('[FlipRadar] First load, found title:', currentTitle);
+        console.log('[FlipChecker] First load, found title:', currentTitle);
         resolve(true);
         return;
       }
 
       // Timeout reached
       if (elapsed > timeout) {
-        console.log('[FlipRadar] Timeout waiting for content change, current title:', currentTitle);
+        console.log('[FlipChecker] Timeout waiting for content change, current title:', currentTitle);
         resolve(false);
         return;
       }
@@ -125,7 +125,7 @@ export function extractTitle() {
             !text.startsWith('$') &&
             !/^\d+$/.test(text) &&
             !isGenericTitle(text)) {
-          console.log('[FlipRadar] Found title via selector:', text);
+          console.log('[FlipChecker] Found title via selector:', text);
           return text;
         }
       }
@@ -156,7 +156,7 @@ export function extractTitle() {
     candidates.sort((a, b) => b.fontSize - a.fontSize);
 
     if (candidates.length > 0) {
-      console.log('[FlipRadar] Found title by prominence:', candidates[0].text);
+      console.log('[FlipChecker] Found title by prominence:', candidates[0].text);
       return candidates[0].text;
     }
   }
@@ -168,12 +168,12 @@ export function extractTitle() {
     if (text.length > 10 && text.length < TITLE_MAX_LENGTH &&
         !isGenericTitle(text) &&
         !text.startsWith('$')) {
-      console.log('[FlipRadar] Found title in heading:', text);
+      console.log('[FlipChecker] Found title in heading:', text);
       return text;
     }
   }
 
-  console.log('[FlipRadar] Could not extract title');
+  console.log('[FlipChecker] Could not extract title');
   return null;
 }
 
@@ -193,7 +193,7 @@ export function extractPrice() {
         const text = span.textContent.trim();
         if (PRICE_REGEX.test(text)) {
           const price = parsePrice(text);
-          console.log('[FlipRadar] Found price near title:', price);
+          console.log('[FlipChecker] Found price near title:', price);
           return price;
         }
       }
@@ -224,12 +224,12 @@ export function extractPrice() {
       p.price >= PRICE_MIN_VALUE && p.fontSize >= PRICE_MIN_FONT_SIZE
     );
     if (mainPrice) {
-      console.log('[FlipRadar] Found prominent price:', mainPrice.price, 'fontSize:', mainPrice.fontSize);
+      console.log('[FlipChecker] Found prominent price:', mainPrice.price, 'fontSize:', mainPrice.fontSize);
       return mainPrice.price;
     }
 
     // Fall back to largest font price
-    console.log('[FlipRadar] Using largest price:', priceElements[0].price);
+    console.log('[FlipChecker] Using largest price:', priceElements[0].price);
     return priceElements[0].price;
   }
 
@@ -240,12 +240,12 @@ export function extractPrice() {
     const priceMatch = text.match(/\$[\d,]+(\.\d{2})?/);
     if (priceMatch) {
       const price = parsePrice(priceMatch[0]);
-      console.log('[FlipRadar] Found price in main content:', price);
+      console.log('[FlipChecker] Found price in main content:', price);
       return price;
     }
   }
 
-  console.log('[FlipRadar] Could not extract price');
+  console.log('[FlipChecker] Could not extract price');
   return null;
 }
 

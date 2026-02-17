@@ -1,4 +1,4 @@
-// FlipRadar Vision Extraction
+// FlipChecker Vision Extraction
 // Uses screenshot + Gemini Vision to extract listing data
 // DOM-agnostic — resilient to Facebook layout changes
 
@@ -15,13 +15,13 @@ function captureScreenshot() {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: 'captureScreenshot' }, (response) => {
       if (chrome.runtime.lastError) {
-        console.log('[FlipRadar] Screenshot capture error:', chrome.runtime.lastError);
+        console.log('[FlipChecker] Screenshot capture error:', chrome.runtime.lastError);
         resolve(null);
         return;
       }
 
       if (!response || !response.success) {
-        console.log('[FlipRadar] Screenshot capture failed:', response?.error);
+        console.log('[FlipChecker] Screenshot capture failed:', response?.error);
         resolve(null);
         return;
       }
@@ -41,18 +41,18 @@ export async function extractWithVision() {
   const authToken = getAuthToken();
 
   if (!authToken) {
-    console.log('[FlipRadar] Vision extraction skipped - not logged in');
+    console.log('[FlipChecker] Vision extraction skipped - not logged in');
     return null;
   }
 
   // Capture screenshot
   const screenshot = await captureScreenshot();
   if (!screenshot) {
-    console.log('[FlipRadar] Vision extraction skipped - screenshot capture failed');
+    console.log('[FlipChecker] Vision extraction skipped - screenshot capture failed');
     return null;
   }
 
-  console.log('[FlipRadar] Sending screenshot to vision extraction (' + Math.round(screenshot.length / 1024) + ' KB)');
+  console.log('[FlipChecker] Sending screenshot to vision extraction (' + Math.round(screenshot.length / 1024) + ' KB)');
 
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({
@@ -69,27 +69,27 @@ export async function extractWithVision() {
       }
     }, (response) => {
       if (chrome.runtime.lastError) {
-        console.log('[FlipRadar] Vision extraction message error:', chrome.runtime.lastError);
+        console.log('[FlipChecker] Vision extraction message error:', chrome.runtime.lastError);
         resolve(null);
         return;
       }
 
       if (!response) {
-        console.log('[FlipRadar] Vision extraction - no response');
+        console.log('[FlipChecker] Vision extraction - no response');
         resolve(null);
         return;
       }
 
       if (!response.ok) {
-        console.log('[FlipRadar] Vision extraction failed:', response.status, response.error || response.data?.error);
+        console.log('[FlipChecker] Vision extraction failed:', response.status, response.error || response.data?.error);
         resolve(null);
         return;
       }
 
       if (response.data?.error) {
-        console.log('[FlipRadar] Vision extraction API error:', response.data.error);
+        console.log('[FlipChecker] Vision extraction API error:', response.data.error);
       }
-      console.log('[FlipRadar] Vision extraction successful:', response.data);
+      console.log('[FlipChecker] Vision extraction successful:', response.data);
       resolve(response.data);
     });
   });

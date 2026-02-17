@@ -1,4 +1,4 @@
-// FlipRadar Authentication Management
+// FlipChecker Authentication Management
 // Handles auth state initialization and auth success events
 
 import { setState, getState, getAuthToken } from './state.js';
@@ -11,7 +11,7 @@ export async function initAuth() {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: 'getAuthToken' }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error('[FlipRadar] Error loading auth state:', chrome.runtime.lastError);
+        console.error('[FlipChecker] Error loading auth state:', chrome.runtime.lastError);
         resolve();
         return;
       }
@@ -21,7 +21,7 @@ export async function initAuth() {
           authToken: response.token,
           currentUser: response.user
         });
-        console.log('[FlipRadar] Auth state loaded:', response.user?.email || 'no user');
+        console.log('[FlipChecker] Auth state loaded:', response.user?.email || 'no user');
       }
       resolve();
     });
@@ -38,7 +38,7 @@ export async function initAuth() {
 export function onAuthSuccess(callback) {
   const listener = (message) => {
     if (message.type === 'authSuccess') {
-      console.log('[FlipRadar] Auth success received');
+      console.log('[FlipChecker] Auth success received');
       // Clear token so it gets re-fetched
       setState({
         authToken: null,
@@ -65,7 +65,7 @@ export function onAuthSuccess(callback) {
 export function onSoldDataReceived(callback) {
   const listener = (message) => {
     if (message.type === 'soldDataAvailable') {
-      console.log('[FlipRadar] Received sold data from eBay:', message.data);
+      console.log('[FlipChecker] Received sold data from eBay:', message.data);
       callback(message.data);
     }
   };

@@ -1,4 +1,4 @@
-// FlipRadar Selector Definitions
+// FlipChecker Selector Definitions
 // Tiered fallback selectors for Facebook Marketplace scraping
 //
 // IMPORTANT: Facebook frequently changes their CSS classes. When scraping breaks,

@@ -1,4 +1,4 @@
-// FlipRadar Shared State Management
+// FlipChecker Shared State Management
 
 // Global state object
 let state = {
@@ -75,7 +75,7 @@ export function startNewJob() {
   const jobId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   state.currentJobId = jobId;
   state.isExtracting = true;
-  console.log('[FlipRadar] Started job:', jobId);
+  console.log('[FlipChecker] Started job:', jobId);
   return jobId;
 }
 
@@ -95,7 +95,7 @@ export function isJobCurrent(jobId) {
 export function endJob(jobId) {
   if (state.currentJobId === jobId) {
     state.isExtracting = false;
-    console.log('[FlipRadar] Ended job:', jobId);
+    console.log('[FlipChecker] Ended job:', jobId);
   }
 }
 

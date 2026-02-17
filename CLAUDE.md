@@ -1,12 +1,12 @@
-# FlipRadar Web - Project Overview (for Extension Context)
+# FlipChecker Web - Project Overview (for Extension Context)
 
-This is a reference document describing the FlipRadar web app, to be used as context in the companion Chrome extension project.
+This is a reference document describing the FlipChecker web app, to be used as context in the companion Chrome extension project.
 
 ---
 
-## What FlipRadar Is
+## What FlipChecker Is
 
-FlipRadar is a SaaS platform + Chrome extension for Facebook Marketplace flippers. Users browse FB Marketplace, and the extension overlays real-time eBay pricing data so they can instantly see profit potential. The web app provides a dashboard to track deals, manage subscriptions, and configure alerts.
+FlipChecker is a SaaS platform + Chrome extension for Facebook Marketplace flippers. Users browse FB Marketplace, and the extension overlays real-time eBay pricing data so they can instantly see profit potential. The web app provides a dashboard to track deals, manage subscriptions, and configure alerts.
 
 **Stack:** Next.js 16 (App Router) · React 19 · Supabase (auth + Postgres) · Stripe (subscriptions) · Tailwind CSS + shadcn/ui · Anthropic Claude (AI extraction) · eBay Browse API
 

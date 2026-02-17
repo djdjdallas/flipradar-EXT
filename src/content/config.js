@@ -1,11 +1,11 @@
-// FlipRadar Configuration Constants
+// FlipChecker Configuration Constants
 
 // IDs for DOM elements
-export const OVERLAY_ID = 'flipradar-overlay';
-export const TRIGGER_BUTTON_ID = 'flipradar-trigger';
+export const OVERLAY_ID = 'flipchecker-overlay';
+export const TRIGGER_BUTTON_ID = 'flipchecker-trigger';
 
 // API Configuration
-export const API_BASE_URL = 'https://flipradar.vercel.app';
+export const API_BASE_URL = 'https://flipchecker.io';
 
 // Cache Configuration
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours

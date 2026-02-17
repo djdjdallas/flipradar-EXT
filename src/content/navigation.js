@@ -1,4 +1,4 @@
-// FlipRadar SPA Navigation Detection
+// FlipChecker SPA Navigation Detection
 // Handles Facebook's single-page app navigation using History API patching
 // and MutationObserver as a backup
 
@@ -61,7 +61,7 @@ function notifyCallbacks(url, itemId) {
     try {
       cb(url, itemId);
     } catch (e) {
-      console.error('[FlipRadar] Navigation callback error:', e);
+      console.error('[FlipChecker] Navigation callback error:', e);
     }
   });
 }
@@ -72,7 +72,7 @@ function notifyCallbacks(url, itemId) {
  */
 export function handleNavigation() {
   const currentUrl = window.location.href;
-  console.log('[FlipRadar] Navigation detected:', currentUrl);
+  console.log('[FlipChecker] Navigation detected:', currentUrl);
 
   if (isMarketplaceItemUrl(currentUrl)) {
     const newItemId = getItemIdFromUrl(currentUrl);
@@ -82,7 +82,7 @@ export function handleNavigation() {
     // If navigating to a DIFFERENT item, clear cached data
     // This ensures waitForNewContent waits for any valid title on new items
     if (newItemId !== previousItemId) {
-      console.log('[FlipRadar] New item detected, clearing cache. Previous:', previousItemId, 'New:', newItemId);
+      console.log('[FlipChecker] New item detected, clearing cache. Previous:', previousItemId, 'New:', newItemId);
       clearLastExtractedData();
     }
 
@@ -117,7 +117,7 @@ export function setupHistoryListener() {
   // Also listen for popstate (back/forward buttons)
   window.addEventListener('popstate', handleNavigation);
 
-  console.log('[FlipRadar] History API listeners installed');
+  console.log('[FlipChecker] History API listeners installed');
 }
 
 /**
@@ -152,7 +152,7 @@ export function setupNavigationObserver() {
   });
 
   currentObserver = observer;
-  console.log('[FlipRadar] MutationObserver backup installed');
+  console.log('[FlipChecker] MutationObserver backup installed');
   return observer;
 }
 
@@ -176,7 +176,7 @@ export function cleanupNavigation() {
  */
 export function initNavigation() {
   if (navigationInitialized) {
-    console.log('[FlipRadar] Navigation already initialized, skipping');
+    console.log('[FlipChecker] Navigation already initialized, skipping');
     return;
   }
   navigationInitialized = true;

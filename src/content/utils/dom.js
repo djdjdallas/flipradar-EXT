@@ -1,4 +1,4 @@
-// FlipRadar DOM Utilities
+// FlipChecker DOM Utilities
 
 import { PAGE_TEXT_MAX_LENGTH } from '../config.js';
 

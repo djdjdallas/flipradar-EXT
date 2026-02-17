@@ -1,4 +1,4 @@
-// FlipRadar Generic Title Filtering
+// FlipChecker Generic Title Filtering
 // Filters out Facebook UI elements that aren't actual product titles
 
 import { TITLE_MIN_LENGTH, TITLE_MAX_LENGTH } from '../config.js';

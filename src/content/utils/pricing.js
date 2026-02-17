@@ -1,4 +1,4 @@
-// FlipRadar Price Utilities
+// FlipChecker Price Utilities
 
 import { EBAY_FEE_MULTIPLIER } from '../config.js';
 

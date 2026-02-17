@@ -1,6 +1,6 @@
-// FlipRadar - Popup Script
+// FlipChecker - Popup Script
 
-const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
+const API_BASE_URL = 'https://flipchecker.io';
 
 let authToken = null;
 let currentUser = null;
@@ -65,7 +65,7 @@ async function loadAuthState() {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: 'getAuthToken' }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error('[FlipRadar] Error loading auth state:', chrome.runtime.lastError);
+        console.error('[FlipChecker] Error loading auth state:', chrome.runtime.lastError);
         resolve();
         return;
       }
@@ -170,7 +170,7 @@ function setupEventListeners() {
 async function handleLogout() {
   chrome.runtime.sendMessage({ type: 'logout' }, () => {
     if (chrome.runtime.lastError) {
-      console.error('[FlipRadar] Error during logout:', chrome.runtime.lastError);
+      console.error('[FlipChecker] Error during logout:', chrome.runtime.lastError);
     }
     authToken = null;
     currentUser = null;
@@ -200,7 +200,7 @@ async function loadUsage() {
 
   // Check if offline
   if (!navigator.onLine) {
-    console.log('[FlipRadar] Offline, skipping usage fetch');
+    console.log('[FlipChecker] Offline, skipping usage fetch');
     return;
   }
 
@@ -213,12 +213,12 @@ async function loadUsage() {
 
     if (response.status === 401) {
       // Token expired, will be handled by auth refresh
-      console.log('[FlipRadar] Token expired');
+      console.log('[FlipChecker] Token expired');
       return;
     }
 
     if (!response.ok) {
-      console.error('[FlipRadar] Failed to load usage:', response.status);
+      console.error('[FlipChecker] Failed to load usage:', response.status);
       return;
     }
 
@@ -244,7 +244,7 @@ async function loadUsage() {
     // Update deal count
     document.getElementById('total-saved').textContent = data.deals?.saved || 0;
   } catch (error) {
-    console.error('[FlipRadar] Failed to load usage:', error);
+    console.error('[FlipChecker] Failed to load usage:', error);
     // Don't show error for usage - it's not critical
   }
 }
@@ -292,7 +292,7 @@ async function loadCloudDeals() {
     renderCloudDeals(data.deals || []);
     updateStats(data.deals || []);
   } catch (error) {
-    console.error('[FlipRadar] Failed to load cloud deals:', error);
+    console.error('[FlipChecker] Failed to load cloud deals:', error);
     showError('Unable to load deals. Check your connection.');
     // Fallback to local deals
     loadLocalDeals();
@@ -453,7 +453,7 @@ async function deleteCloudDeal(dealId) {
       showError('Failed to delete deal. Please try again.');
     }
   } catch (error) {
-    console.error('[FlipRadar] Failed to delete deal:', error);
+    console.error('[FlipChecker] Failed to delete deal:', error);
     showError('Failed to delete deal. Check your connection.');
   }
 }

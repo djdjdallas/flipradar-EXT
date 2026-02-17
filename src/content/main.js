@@ -1,4 +1,4 @@
-// FlipRadar Content Script - Main Entry Point
+// FlipChecker Content Script - Main Entry Point
 // Orchestrates all modules for Facebook Marketplace scraping
 
 import { DOM_SETTLE_DELAY_MS } from './config.js';
@@ -41,61 +41,61 @@ async function extractData(jobId, itemId) {
 
   // Check job is still current before starting
   if (!isJobCurrent(jobId)) {
-    console.log('[FlipRadar] Job cancelled before extraction, aborting');
+    console.log('[FlipChecker] Job cancelled before extraction, aborting');
     return null;
   }
 
   // Tier 1: Check for intercepted GraphQL data (fastest)
   const graphQLData = getInterceptedData(itemId);
   if (graphQLData) {
-    console.log('[FlipRadar] Using intercepted GraphQL data');
+    console.log('[FlipChecker] Using intercepted GraphQL data');
     data = graphQLData;
     method = 'graphql';
   }
 
   // Tier 2: Try vision extraction (screenshot + Gemini) if logged in and no GraphQL data
   if (!data && isLoggedIn()) {
-    console.log('[FlipRadar] Attempting vision extraction...');
+    console.log('[FlipChecker] Attempting vision extraction...');
     const visionData = await extractWithVision();
 
     // Check job still current after async operation
     if (!isJobCurrent(jobId)) {
-      console.log('[FlipRadar] Job cancelled during vision extraction');
+      console.log('[FlipChecker] Job cancelled during vision extraction');
       return null;
     }
 
     if (visionData && (visionData.title || visionData.price)) {
       data = transformVisionData(visionData, itemId);
       method = 'vision';
-      console.log('[FlipRadar] Vision extraction successful:', data.title);
+      console.log('[FlipChecker] Vision extraction successful:', data.title);
     } else {
-      console.log('[FlipRadar] Vision extraction returned no usable data');
+      console.log('[FlipChecker] Vision extraction returned no usable data');
     }
   }
 
   // Tier 3: Try AI text extraction if logged in and no data yet
   if (!data && isLoggedIn()) {
-    console.log('[FlipRadar] Attempting AI extraction...');
+    console.log('[FlipChecker] Attempting AI extraction...');
     const aiData = await extractWithAI();
 
     // Check job still current after async operation
     if (!isJobCurrent(jobId)) {
-      console.log('[FlipRadar] Job cancelled during AI extraction');
+      console.log('[FlipChecker] Job cancelled during AI extraction');
       return null;
     }
 
     if (aiData && (aiData.title || aiData.price)) {
       data = transformAIData(aiData, itemId);
       method = 'ai';
-      console.log('[FlipRadar] AI extraction successful:', data.title);
+      console.log('[FlipChecker] AI extraction successful:', data.title);
     } else {
-      console.log('[FlipRadar] AI extraction returned no usable data');
+      console.log('[FlipChecker] AI extraction returned no usable data');
     }
   }
 
   // Tier 4: DOM extraction fallback
   if (!data || (!data.title && !data.price)) {
-    console.log('[FlipRadar] Using DOM extraction (fallback)...');
+    console.log('[FlipChecker] Using DOM extraction (fallback)...');
 
     // Wait for content to be ready (pass jobId for self-cancellation)
     const previousTitle = getLastExtractedData()?.title || null;
@@ -103,16 +103,16 @@ async function extractData(jobId, itemId) {
 
     // Check job still current after waiting
     if (!isJobCurrent(jobId)) {
-      console.log('[FlipRadar] Job cancelled during DOM wait');
+      console.log('[FlipChecker] Job cancelled during DOM wait');
       return null;
     }
 
     data = extractAllData(itemId);
     method = 'dom';
-    console.log('[FlipRadar] DOM extraction result:', data.title);
+    console.log('[FlipChecker] DOM extraction result:', data.title);
   }
 
-  console.log('[FlipRadar] Extraction complete (method:', method + '):', data?.title);
+  console.log('[FlipChecker] Extraction complete (method:', method + '):', data?.title);
   return { data, method };
 }
 
@@ -126,7 +126,7 @@ async function initOverlay() {
   const currentPageUrl = window.location.href;
   const itemId = getItemId();
 
-  console.log('[FlipRadar] initOverlay started, job:', jobId, 'item:', itemId);
+  console.log('[FlipChecker] initOverlay started, job:', jobId, 'item:', itemId);
 
   // Show loading overlay immediately
   createLoadingOverlay({ title: 'Loading...', itemId });
@@ -136,7 +136,7 @@ async function initOverlay() {
 
   // Verify URL hasn't changed during wait
   if (!isJobCurrent(jobId) || window.location.href !== currentPageUrl) {
-    console.log('[FlipRadar] Navigation during init wait, aborting job:', jobId);
+    console.log('[FlipChecker] Navigation during init wait, aborting job:', jobId);
     endJob(jobId);
     return;
   }
@@ -148,7 +148,7 @@ async function initOverlay() {
   const result = await extractData(jobId, itemId);
 
   if (!result || !isJobCurrent(jobId)) {
-    console.log('[FlipRadar] Extraction failed or job cancelled');
+    console.log('[FlipChecker] Extraction failed or job cancelled');
     endJob(jobId);
     return;
   }
@@ -158,11 +158,11 @@ async function initOverlay() {
   // Store for next comparison on navigation
   setLastExtractedData(data);
 
-  console.log('[FlipRadar] Final data (method: ' + method + '):', data);
+  console.log('[FlipChecker] Final data (method: ' + method + '):', data);
 
   // Check if we got usable data
   if (!data.title && !data.price) {
-    console.log('[FlipRadar] Could not extract listing data');
+    console.log('[FlipChecker] Could not extract listing data');
     // Show overlay with error state
     await createOverlay({ title: null, price: null, itemId }, null);
     endJob(jobId);
@@ -176,7 +176,7 @@ async function initOverlay() {
 
     // Check job still current after price lookup
     if (!isJobCurrent(jobId)) {
-      console.log('[FlipRadar] Job cancelled during price lookup');
+      console.log('[FlipChecker] Job cancelled during price lookup');
       endJob(jobId);
       return;
     }
@@ -192,7 +192,7 @@ async function initOverlay() {
  * Shows the trigger button for the new item
  */
 function handleMarketplaceNavigation(url, itemId) {
-  console.log('[FlipRadar] Handling marketplace navigation:', url);
+  console.log('[FlipChecker] Handling marketplace navigation:', url);
   showTriggerButton(() => {
     initOverlay();
   });
@@ -208,13 +208,13 @@ let cleanupSoldDataListener = null;
  */
 function init() {
   if (initialized) {
-    console.log('[FlipRadar] Already initialized, skipping');
+    console.log('[FlipChecker] Already initialized, skipping');
     return;
   }
   initialized = true;
 
-  console.log('[FlipRadar] Content script loaded on:', window.location.href);
-  console.log('[FlipRadar] Is marketplace item page:', isMarketplaceItemPage());
+  console.log('[FlipChecker] Content script loaded on:', window.location.href);
+  console.log('[FlipChecker] Is marketplace item page:', isMarketplaceItemPage());
 
   // Setup network interception early (before navigation to capture initial data)
   setupNetworkInterception();
@@ -239,7 +239,7 @@ function init() {
 
   // Listen for auth success - refresh overlay if on marketplace page
   cleanupAuthListener = onAuthSuccess(() => {
-    console.log('[FlipRadar] Auth success, checking if should refresh overlay');
+    console.log('[FlipChecker] Auth success, checking if should refresh overlay');
     if (isMarketplaceItemPage()) {
       initOverlay();
     }
@@ -247,8 +247,8 @@ function init() {
 
   // Listen for sold data from eBay reader - refresh overlay if visible
   cleanupSoldDataListener = onSoldDataReceived((soldData) => {
-    console.log('[FlipRadar] Received sold data, checking if should refresh overlay');
-    const overlay = document.getElementById('flipradar-overlay');
+    console.log('[FlipChecker] Received sold data, checking if should refresh overlay');
+    const overlay = document.getElementById('flipchecker-overlay');
     if (overlay && isMarketplaceItemPage()) {
       // Re-initialize overlay to pick up new sold data
       initOverlay();
@@ -257,7 +257,7 @@ function init() {
 
   // Check initial page - show button if on marketplace item
   if (isMarketplaceItemPage()) {
-    console.log('[FlipRadar] Initial page is marketplace item, showing trigger button');
+    console.log('[FlipChecker] Initial page is marketplace item, showing trigger button');
     showTriggerButton(() => {
       initOverlay();
     });
@@ -266,9 +266,9 @@ function init() {
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
-  console.log('[FlipRadar] Waiting for DOMContentLoaded...');
+  console.log('[FlipChecker] Waiting for DOMContentLoaded...');
   document.addEventListener('DOMContentLoaded', init);
 } else {
-  console.log('[FlipRadar] Document ready, initializing...');
+  console.log('[FlipChecker] Document ready, initializing...');
   init();
 }

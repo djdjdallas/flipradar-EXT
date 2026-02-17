@@ -1,6 +1,6 @@
-/* FlipRadar - Overlay Positioning */
+/* FlipChecker - Overlay Positioning */
 
-#flipradar-overlay {
+#flipchecker-overlay {
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -9,6 +9,6 @@
 }
 
 /* Ensure overlay doesn't get hidden by FB modals */
-#flipradar-overlay * {
+#flipchecker-overlay * {
   all: initial;
 }

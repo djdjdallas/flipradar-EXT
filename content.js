@@ -1,10 +1,10 @@
-// FlipRadar - Content Script for Facebook Marketplace
+// FlipChecker - Content Script for Facebook Marketplace
 (function() {
   'use strict';
 
   // Constants
-  const OVERLAY_ID = 'flipradar-overlay';
-  const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
+  const OVERLAY_ID = 'flipchecker-overlay';
+  const API_BASE_URL = 'https://flipchecker.io';
   const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
   const MAX_LOCAL_DEALS = 100;
   const EBAY_FEE_MULTIPLIER = 0.84; // 13% eBay + 3% payment fees
@@ -72,7 +72,7 @@
 
       // If we're on the same item as before (re-clicking), skip wait
       if (lastExtractedData?.itemId === currentItemId && lastExtractedData?.title) {
-        console.log('[FlipRadar] Same item, skipping wait. Using cached title:', lastExtractedData.title);
+        console.log('[FlipChecker] Same item, skipping wait. Using cached title:', lastExtractedData.title);
         resolve(true);
         return;
       }
@@ -86,21 +86,21 @@
 
         // Content has changed to a real title (different from previous)
         if (currentTitle && !isGeneric && currentTitle !== previousTitle && elapsed >= MIN_WAIT_MS) {
-          console.log('[FlipRadar] Content changed, new title:', currentTitle);
+          console.log('[FlipChecker] Content changed, new title:', currentTitle);
           resolve(true);
           return;
         }
 
         // If no previous title (first load), wait for any real title after minimum wait
         if (!previousTitle && currentTitle && !isGeneric && elapsed >= MIN_WAIT_MS) {
-          console.log('[FlipRadar] First load, found title:', currentTitle);
+          console.log('[FlipChecker] First load, found title:', currentTitle);
           resolve(true);
           return;
         }
 
         // Timeout reached
         if (elapsed > timeout) {
-          console.log('[FlipRadar] Timeout waiting for content change, current title:', currentTitle);
+          console.log('[FlipChecker] Timeout waiting for content change, current title:', currentTitle);
           resolve(false);
           return;
         }
@@ -118,7 +118,7 @@
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: 'getAuthToken' }, (response) => {
         if (chrome.runtime.lastError) {
-          console.error('[FlipRadar] Error loading auth state:', chrome.runtime.lastError);
+          console.error('[FlipChecker] Error loading auth state:', chrome.runtime.lastError);
           resolve();
           return;
         }
@@ -154,7 +154,7 @@
                 !text.startsWith('$') &&
                 !/^\d+$/.test(text) &&
                 !isGenericTitle(text)) {
-              console.log('[FlipRadar] Found title via FB selector:', text);
+              console.log('[FlipChecker] Found title via FB selector:', text);
               return text;
             }
           }
@@ -186,7 +186,7 @@
         candidates.sort((a, b) => b.fontSize - a.fontSize);
 
         if (candidates.length > 0) {
-          console.log('[FlipRadar] Found title by prominence:', candidates[0].text);
+          console.log('[FlipChecker] Found title by prominence:', candidates[0].text);
           return candidates[0].text;
         }
       }
@@ -198,12 +198,12 @@
         if (text.length > 10 && text.length < 300 &&
             !isGenericTitle(text) &&
             !text.startsWith('$')) {
-          console.log('[FlipRadar] Found title in heading:', text);
+          console.log('[FlipChecker] Found title in heading:', text);
           return text;
         }
       }
 
-      console.log('[FlipRadar] Could not extract title');
+      console.log('[FlipChecker] Could not extract title');
       return null;
     },
 
@@ -223,7 +223,7 @@
             const text = span.textContent.trim();
             if (priceRegex.test(text)) {
               const price = parsePrice(text);
-              console.log('[FlipRadar] Found price near title:', price);
+              console.log('[FlipChecker] Found price near title:', price);
               return price;
             }
           }
@@ -253,12 +253,12 @@
         // The listing price is usually > $5 and shown in larger font
         const mainPrice = priceElements.find(p => p.price >= 5 && p.fontSize >= 14);
         if (mainPrice) {
-          console.log('[FlipRadar] Found prominent price:', mainPrice.price, 'fontSize:', mainPrice.fontSize);
+          console.log('[FlipChecker] Found prominent price:', mainPrice.price, 'fontSize:', mainPrice.fontSize);
           return mainPrice.price;
         }
 
         // Fall back to largest font price
-        console.log('[FlipRadar] Using largest price:', priceElements[0].price);
+        console.log('[FlipChecker] Using largest price:', priceElements[0].price);
         return priceElements[0].price;
       }
 
@@ -269,12 +269,12 @@
         const priceMatch = text.match(/\$[\d,]+(\.\d{2})?/);
         if (priceMatch) {
           const price = parsePrice(priceMatch[0]);
-          console.log('[FlipRadar] Found price in main content:', price);
+          console.log('[FlipChecker] Found price in main content:', price);
           return price;
         }
       }
 
-      console.log('[FlipRadar] Could not extract price');
+      console.log('[FlipChecker] Could not extract price');
       return null;
     },
 
@@ -434,7 +434,7 @@
         body: { title }
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.error('[FlipRadar] Price lookup message error:', chrome.runtime.lastError);
+          console.error('[FlipChecker] Price lookup message error:', chrome.runtime.lastError);
           resolve({ error: 'network_error' });
           return;
         }
@@ -468,7 +468,7 @@
   // This is the PRIMARY extraction method - more reliable than DOM scraping
   async function extractWithAI() {
     if (!authToken) {
-      console.log('[FlipRadar] AI extraction skipped - not logged in');
+      console.log('[FlipChecker] AI extraction skipped - not logged in');
       return null;
     }
 
@@ -482,7 +482,7 @@
         pageText = document.body.innerText.substring(0, 10000);
       }
 
-      console.log('[FlipRadar] Sending page text to AI extraction (' + pageText.length + ' chars)');
+      console.log('[FlipChecker] Sending page text to AI extraction (' + pageText.length + ' chars)');
 
       chrome.runtime.sendMessage({
         type: 'apiRequest',
@@ -498,24 +498,24 @@
         }
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.log('[FlipRadar] AI extraction message error:', chrome.runtime.lastError);
+          console.log('[FlipChecker] AI extraction message error:', chrome.runtime.lastError);
           resolve(null);
           return;
         }
 
         if (!response) {
-          console.log('[FlipRadar] AI extraction - no response');
+          console.log('[FlipChecker] AI extraction - no response');
           resolve(null);
           return;
         }
 
         if (!response.ok) {
-          console.log('[FlipRadar] AI extraction failed:', response.status, response.error || response.data?.error);
+          console.log('[FlipChecker] AI extraction failed:', response.status, response.error || response.data?.error);
           resolve(null);
           return;
         }
 
-        console.log('[FlipRadar] AI extraction successful:', response.data);
+        console.log('[FlipChecker] AI extraction successful:', response.data);
         resolve(response.data);
       });
     });
@@ -543,10 +543,10 @@
         .replace(/\s+/g, '_')
         .substring(0, 50);
 
-      const storageKey = `flipradar_sold_${queryKey}`;
+      const storageKey = `flipchecker_sold_${queryKey}`;
 
       // Try exact match first, then fall back to last lookup
-      chrome.storage.local.get([storageKey, 'flipradar_last_sold'], (result) => {
+      chrome.storage.local.get([storageKey, 'flipchecker_last_sold'], (result) => {
         // Check if we have an exact match
         if (result[storageKey] && isDataFresh(result[storageKey].timestamp)) {
           resolve(result[storageKey]);
@@ -555,8 +555,8 @@
 
         // Check if last lookup is relevant (fuzzy match on query)
         // Only use if there's very strong overlap to avoid showing wrong data
-        if (result.flipradar_last_sold && isDataFresh(result.flipradar_last_sold.timestamp)) {
-          const lastQuery = result.flipradar_last_sold.query.toLowerCase();
+        if (result.flipchecker_last_sold && isDataFresh(result.flipchecker_last_sold.timestamp)) {
+          const lastQuery = result.flipchecker_last_sold.query.toLowerCase();
           const currentTitle = title.toLowerCase();
 
           // Check if there's meaningful overlap - require stronger match
@@ -566,11 +566,11 @@
 
           // Require at least 50% word overlap for fuzzy match
           const overlapRatio = titleWords.length > 0 ? overlap.length / titleWords.length : 0;
-          console.log('[FlipRadar] Fuzzy match check - overlap:', overlap.length, 'ratio:', overlapRatio);
+          console.log('[FlipChecker] Fuzzy match check - overlap:', overlap.length, 'ratio:', overlapRatio);
 
           if (overlapRatio >= 0.5 && overlap.length >= 2) {
-            console.log('[FlipRadar] Using fuzzy matched sold data');
-            resolve(result.flipradar_last_sold);
+            console.log('[FlipChecker] Using fuzzy matched sold data');
+            resolve(result.flipchecker_last_sold);
             return;
           }
         }
@@ -607,7 +607,7 @@
         }
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.error('[FlipRadar] Save deal message error:', chrome.runtime.lastError);
+          console.error('[FlipChecker] Save deal message error:', chrome.runtime.lastError);
           saveDealLocally(data);
           resolve({ success: true, local: true });
           return;
@@ -625,13 +625,13 @@
             return;
           }
 
-          console.error('[FlipRadar] API save failed:', response?.error || response?.status);
+          console.error('[FlipChecker] API save failed:', response?.error || response?.status);
           saveDealLocally(data);
           resolve({ success: true, local: true });
           return;
         }
 
-        console.log('[FlipRadar] Deal saved to cloud successfully');
+        console.log('[FlipChecker] Deal saved to cloud successfully');
         resolve({ success: true });
       });
     });
@@ -663,7 +663,7 @@
     // Verify we're still on the same item before showing overlay
     const currentItemId = getItemId();
     if (data.itemId && data.itemId !== currentItemId) {
-      console.log('[FlipRadar] Data item ID mismatch, aborting overlay. Expected:', data.itemId, 'Current:', currentItemId);
+      console.log('[FlipChecker] Data item ID mismatch, aborting overlay. Expected:', data.itemId, 'Current:', currentItemId);
       return;
     }
 
@@ -987,7 +987,7 @@
       ${styles}
       <div class="container">
         <div class="header">
-          <span class="logo">FlipRadar ${tierBadge}</span>
+          <span class="logo">FlipChecker ${tierBadge}</span>
           <button class="close-btn" id="close-overlay">&times;</button>
         </div>
 
@@ -1272,7 +1272,7 @@
       </style>
       <div class="container">
         <div class="header">
-          <span class="logo">FlipRadar</span>
+          <span class="logo">FlipChecker</span>
         </div>
         <div class="loading">
           <div class="spinner"></div>
@@ -1292,7 +1292,7 @@
     // Store current URL and item ID to verify we're extracting data for the right page
     const currentPageUrl = window.location.href;
     const itemId = getItemId();
-    console.log('[FlipRadar] initOverlay called for:', currentPageUrl, 'itemId:', itemId);
+    console.log('[FlipChecker] initOverlay called for:', currentPageUrl, 'itemId:', itemId);
 
     // Show loading overlay immediately
     createLoadingOverlay({ title: 'Loading...', itemId });
@@ -1302,7 +1302,7 @@
 
     // Verify URL hasn't changed during wait
     if (window.location.href !== currentPageUrl) {
-      console.log('[FlipRadar] URL changed during wait, aborting');
+      console.log('[FlipChecker] URL changed during wait, aborting');
       return;
     }
 
@@ -1311,7 +1311,7 @@
 
     // PRIMARY: Try AI extraction first (most reliable, resilient to DOM changes)
     if (authToken) {
-      console.log('[FlipRadar] Attempting AI extraction (primary method)...');
+      console.log('[FlipChecker] Attempting AI extraction (primary method)...');
       const aiData = await extractWithAI();
 
       if (aiData && (aiData.title || aiData.price)) {
@@ -1325,15 +1325,15 @@
           imageUrl: extractors.getImageUrl(),
           itemId: itemId
         };
-        console.log('[FlipRadar] AI extraction successful:', data.title);
+        console.log('[FlipChecker] AI extraction successful:', data.title);
       } else {
-        console.log('[FlipRadar] AI extraction returned no usable data');
+        console.log('[FlipChecker] AI extraction returned no usable data');
       }
     }
 
     // FALLBACK: DOM extraction if AI failed or user not logged in
     if (!data || (!data.title && !data.price)) {
-      console.log('[FlipRadar] Using DOM extraction (fallback)...');
+      console.log('[FlipChecker] Using DOM extraction (fallback)...');
       extractionMethod = 'dom';
 
       // Wait for content to be ready
@@ -1342,7 +1342,7 @@
 
       // Verify URL still matches
       if (window.location.href !== currentPageUrl) {
-        console.log('[FlipRadar] URL changed during DOM wait, aborting');
+        console.log('[FlipChecker] URL changed during DOM wait, aborting');
         return;
       }
 
@@ -1355,16 +1355,16 @@
         imageUrl: extractors.getImageUrl(),
         itemId: itemId
       };
-      console.log('[FlipRadar] DOM extraction result:', data.title);
+      console.log('[FlipChecker] DOM extraction result:', data.title);
     }
 
     // Store for next comparison
     lastExtractedData = data;
 
-    console.log('[FlipRadar] Final data (method: ' + extractionMethod + '):', data);
+    console.log('[FlipChecker] Final data (method: ' + extractionMethod + '):', data);
 
     if (!data.title && !data.price) {
-      console.log('[FlipRadar] Could not extract listing data');
+      console.log('[FlipChecker] Could not extract listing data');
       // Show error in overlay
       await createOverlay({ title: null, price: null, itemId }, null);
       return;
@@ -1387,7 +1387,7 @@
 
   // Handle navigation event (called when URL changes)
   function handleNavigation() {
-    console.log('[FlipRadar] Navigation detected:', window.location.href);
+    console.log('[FlipChecker] Navigation detected:', window.location.href);
     if (isMarketplaceItemPage()) {
       const newItemId = getItemId();
       const previousItemId = lastExtractedData?.itemId;
@@ -1395,14 +1395,14 @@
       // If navigating to a DIFFERENT item, clear cached data
       // This ensures we wait for any valid title without comparing to old item's data
       if (newItemId !== previousItemId) {
-        console.log('[FlipRadar] New item detected, clearing cache. Previous:', previousItemId, 'New:', newItemId);
+        console.log('[FlipChecker] New item detected, clearing cache. Previous:', previousItemId, 'New:', newItemId);
         lastExtractedData = null;
       }
 
       showTriggerButton();
     } else {
       // Remove button/overlay when leaving marketplace item
-      const btn = document.getElementById('flipradar-trigger');
+      const btn = document.getElementById('flipchecker-trigger');
       const overlay = document.getElementById(OVERLAY_ID);
       if (btn) btn.remove();
       if (overlay) overlay.remove();
@@ -1452,13 +1452,13 @@
             const newItemId = getItemId();
             const previousItemId = lastExtractedData?.itemId;
             if (newItemId !== previousItemId) {
-              console.log('[FlipRadar] Observer: New item detected, clearing cache');
+              console.log('[FlipChecker] Observer: New item detected, clearing cache');
               lastExtractedData = null;
             }
             showTriggerButton();
           } else {
             // Remove trigger button and overlay when navigating away
-            const triggerBtn = document.getElementById('flipradar-trigger');
+            const triggerBtn = document.getElementById('flipchecker-trigger');
             if (triggerBtn) {
               triggerBtn.remove();
             }
@@ -1491,7 +1491,7 @@
 
     // Listen for sold data captured from eBay tabs
     if (message.type === 'soldDataAvailable') {
-      console.log('[FlipRadar] Received sold data from eBay:', message.data);
+      console.log('[FlipChecker] Received sold data from eBay:', message.data);
 
       // If overlay is open, refresh it to show new sold data
       if (document.getElementById(OVERLAY_ID) && isMarketplaceItemPage()) {
@@ -1503,7 +1503,7 @@
 
   // Show trigger button (user must click to activate)
   function showTriggerButton() {
-    console.log('[FlipRadar] showTriggerButton called for URL:', window.location.href);
+    console.log('[FlipChecker] showTriggerButton called for URL:', window.location.href);
 
     // Note: lastExtractedData is cleared by handleNavigation() when item ID changes
     // This ensures waitForNewContent waits for any valid title on new items
@@ -1511,18 +1511,18 @@
     // Always remove existing overlay when showing button for a new item
     const existingOverlay = document.getElementById(OVERLAY_ID);
     if (existingOverlay) {
-      console.log('[FlipRadar] Removing old overlay');
+      console.log('[FlipChecker] Removing old overlay');
       existingOverlay.remove();
     }
 
-    const existingBtn = document.getElementById('flipradar-trigger');
+    const existingBtn = document.getElementById('flipchecker-trigger');
     if (existingBtn) {
-      console.log('[FlipRadar] Removing old button');
+      console.log('[FlipChecker] Removing old button');
       existingBtn.remove();
     }
 
     const btn = document.createElement('button');
-    btn.id = 'flipradar-trigger';
+    btn.id = 'flipchecker-trigger';
     btn.innerHTML = '💰 Check Flip';
     btn.style.cssText = `
       position: fixed;
@@ -1545,19 +1545,19 @@
       initOverlay();
     });
     document.body.appendChild(btn);
-    console.log('[FlipRadar] Button added to page:', btn);
+    console.log('[FlipChecker] Button added to page:', btn);
   }
 
   // Initialize
   function init() {
-    console.log('[FlipRadar] Content script loaded on:', window.location.href);
-    console.log('[FlipRadar] Is marketplace item page:', isMarketplaceItemPage());
+    console.log('[FlipChecker] Content script loaded on:', window.location.href);
+    console.log('[FlipChecker] Is marketplace item page:', isMarketplaceItemPage());
 
     // Setup History API listener (primary navigation detection for SPA)
     setupHistoryListener();
 
     if (isMarketplaceItemPage()) {
-      console.log('[FlipRadar] Showing trigger button...');
+      console.log('[FlipChecker] Showing trigger button...');
       showTriggerButton();
     }
 
@@ -1566,10 +1566,10 @@
   }
 
   if (document.readyState === 'loading') {
-    console.log('[FlipRadar] Waiting for DOMContentLoaded...');
+    console.log('[FlipChecker] Waiting for DOMContentLoaded...');
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    console.log('[FlipRadar] Document ready, initializing...');
+    console.log('[FlipChecker] Document ready, initializing...');
     init();
   }
 })();

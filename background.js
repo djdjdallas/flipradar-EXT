@@ -1,7 +1,7 @@
-// FlipRadar - Background Service Worker
+// FlipChecker - Background Service Worker
 
 // API base URL
-const API_BASE_URL = 'https://flipradar-iaxg.vercel.app';
+const API_BASE_URL = 'https://flipchecker.io';
 
 // Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -89,7 +89,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           data
         });
       } catch (error) {
-        console.error('[FlipRadar] API proxy error:', error);
+        console.error('[FlipChecker] API proxy error:', error);
         sendResponse({
           ok: false,
           status: 0,
@@ -126,7 +126,7 @@ async function handleAuthCallback(url, tabId) {
         user: user
       });
 
-      console.log('[FlipRadar] Auth successful, token stored');
+      console.log('[FlipChecker] Auth successful, token stored');
 
       // Close the auth tab and show success
       chrome.tabs.remove(tabId);
@@ -135,7 +135,7 @@ async function handleAuthCallback(url, tabId) {
       chrome.runtime.sendMessage({ type: 'authSuccess', user });
     }
   } catch (error) {
-    console.error('[FlipRadar] Auth callback error:', error);
+    console.error('[FlipChecker] Auth callback error:', error);
   }
 }
 
@@ -156,10 +156,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         if (response.status === 401) {
           // Token expired, clear it
           await chrome.storage.local.remove(['authToken', 'user']);
-          console.log('[FlipRadar] Token expired, cleared');
+          console.log('[FlipChecker] Token expired, cleared');
         }
       } catch (error) {
-        console.error('[FlipRadar] Token refresh check failed:', error);
+        console.error('[FlipChecker] Token refresh check failed:', error);
       }
     }
   }

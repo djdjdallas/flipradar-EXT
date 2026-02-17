@@ -1,7 +1,7 @@
-// FlipRadar - Background Service Worker
+// FlipChecker - Background Service Worker
 
 // API base URL
-const API_BASE_URL = 'https://flipradar.vercel.app';
+const API_BASE_URL = 'https://flipchecker.io';
 
 // Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -49,7 +49,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Capture visible tab as JPEG screenshot for vision extraction
     chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 80 }, (dataUrl) => {
       if (chrome.runtime.lastError) {
-        console.error('[FlipRadar] Screenshot capture error:', chrome.runtime.lastError);
+        console.error('[FlipChecker] Screenshot capture error:', chrome.runtime.lastError);
         sendResponse({ success: false, error: chrome.runtime.lastError.message });
         return;
       }
@@ -63,7 +63,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Proxy API requests from content scripts to bypass CORS
     // Only allow requests to our own API
     if (!message.url || !message.url.startsWith(API_BASE_URL)) {
-      console.warn('[FlipRadar] API proxy blocked request to non-API URL:', message.url);
+      console.warn('[FlipChecker] API proxy blocked request to non-API URL:', message.url);
       sendResponse({
         ok: false,
         status: 0,
@@ -95,7 +95,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           data = await response.json();
         } catch (jsonError) {
-          console.warn('[FlipRadar] API proxy: failed to parse JSON response:', jsonError.message);
+          console.warn('[FlipChecker] API proxy: failed to parse JSON response:', jsonError.message);
           data = null;
         }
 
@@ -105,7 +105,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           data
         });
       } catch (error) {
-        console.error('[FlipRadar] API proxy error:', error);
+        console.error('[FlipChecker] API proxy error:', error);
         sendResponse({
           ok: false,
           status: 0,
@@ -129,11 +129,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       const urlObj = new URL(changeInfo.url);
       const apiOrigin = new URL(API_BASE_URL).origin;
       if (urlObj.origin !== apiOrigin) {
-        console.warn('[FlipRadar] Auth callback blocked from unexpected origin:', urlObj.origin);
+        console.warn('[FlipChecker] Auth callback blocked from unexpected origin:', urlObj.origin);
         return;
       }
     } catch {
-      console.warn('[FlipRadar] Auth callback URL parse failed:', changeInfo.url);
+      console.warn('[FlipChecker] Auth callback URL parse failed:', changeInfo.url);
       return;
     }
     handleAuthCallback(changeInfo.url, tabId);
@@ -156,7 +156,7 @@ async function handleAuthCallback(url, tabId) {
         user: user
       });
 
-      console.log('[FlipRadar] Auth successful, token stored');
+      console.log('[FlipChecker] Auth successful, token stored');
 
       // Close the auth tab and show success
       chrome.tabs.remove(tabId);
@@ -165,7 +165,7 @@ async function handleAuthCallback(url, tabId) {
       chrome.runtime.sendMessage({ type: 'authSuccess', user });
     }
   } catch (error) {
-    console.error('[FlipRadar] Auth callback error:', error);
+    console.error('[FlipChecker] Auth callback error:', error);
   }
 }
 
@@ -186,10 +186,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         if (response.status === 401) {
           // Token expired, clear it
           await chrome.storage.local.remove(['authToken', 'user']);
-          console.log('[FlipRadar] Token expired, cleared');
+          console.log('[FlipChecker] Token expired, cleared');
         }
       } catch (error) {
-        console.error('[FlipRadar] Token refresh check failed:', error);
+        console.error('[FlipChecker] Token refresh check failed:', error);
       }
     }
   }

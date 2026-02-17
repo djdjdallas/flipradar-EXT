@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "FlipRadar",
+  "name": "FlipChecker",
   "version": "1.3.0",
   "description": "Quickly assess profit potential on Facebook Marketplace by comparing prices to eBay sold listings.",
   "permissions": [
@@ -13,7 +13,7 @@
     "<all_urls>",
     "*://www.facebook.com/*",
     "*://www.ebay.com/*",
-    "*://flipradar.vercel.app/*"
+    "*://flipchecker.io/*"
   ],
   "action": {
     "default_popup": "popup.html",
