@@ -28,3 +28,8 @@ export const TITLE_MIN_LENGTH = 5;
 export const TITLE_MAX_LENGTH = 300;
 export const PRICE_MIN_VALUE = 5;
 export const PRICE_MIN_FONT_SIZE = 14;
+
+// Watchlist Scanner
+export const WATCHLIST_SCAN_DELAY_MS = 500;
+export const WATCHLIST_SCANNED_TTL_MS = 60 * 60 * 1000; // 60 minutes
+export const WATCHLIST_MAX_SCANS_PER_PAGE = 10;

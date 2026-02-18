@@ -23,6 +23,8 @@ import { extractWithVision, transformVisionData } from './visionExtractor.js';
 import { fetchPriceData } from './api.js';
 import { initAuth, onAuthSuccess, onSoldDataReceived, isLoggedIn } from './auth.js';
 import { createOverlay, createLoadingOverlay, showTriggerButton } from './overlay.js';
+import { isSearchResultsPage } from './searchScraper.js';
+import { initWatchlistScanner, cleanupWatchlistScanner } from './watchlistScanner.js';
 
 /**
  * Data extraction cascade:
@@ -225,7 +227,13 @@ function init() {
   // Register navigation handler
   onNavigation((url, itemId) => {
     if (isMarketplaceItemUrl(url)) {
+      cleanupWatchlistScanner();
       handleMarketplaceNavigation(url, itemId);
+    } else if (isSearchResultsPage(url)) {
+      cleanupWatchlistScanner();
+      initWatchlistScanner();
+    } else {
+      cleanupWatchlistScanner();
     }
   });
 
@@ -261,6 +269,9 @@ function init() {
     showTriggerButton(() => {
       initOverlay();
     });
+  } else if (isSearchResultsPage(window.location.href)) {
+    console.log('[FlipChecker] Initial page is marketplace search, initializing watchlist scanner');
+    initWatchlistScanner();
   }
 }
 

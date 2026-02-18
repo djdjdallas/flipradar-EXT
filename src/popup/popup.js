@@ -5,6 +5,8 @@ const API_BASE_URL = 'https://flipchecker.io';
 let authToken = null;
 let currentUser = null;
 let currentTab = 'cloud';
+let watchlistFilters = [];
+let watchlistAlerts = [];
 
 // Error handling
 function showError(message) {
@@ -178,6 +180,14 @@ function setupEventListeners() {
       });
     }
   });
+
+  // Listen for watchlist alert updates from content script
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.watchlistAlerts && currentTab === 'watchlist') {
+      watchlistAlerts = changes.watchlistAlerts.newValue || [];
+      renderWatchlistAlerts();
+    }
+  });
 }
 
 async function handleLogout() {
@@ -200,11 +210,24 @@ function handleTabChange(tab) {
     t.classList.toggle('active', t.dataset.tab === tab);
   });
 
-  // Load appropriate deals
-  if (tab === 'cloud') {
-    loadCloudDeals();
+  const dealsContainer = document.getElementById('deals-container');
+  const watchlistContainer = document.getElementById('watchlist-container');
+  const sectionHeader = document.querySelector('.section-header');
+
+  if (tab === 'watchlist') {
+    dealsContainer.style.display = 'none';
+    watchlistContainer.style.display = 'block';
+    if (sectionHeader) sectionHeader.style.display = 'none';
+    loadWatchlistTab();
   } else {
-    loadLocalDeals();
+    dealsContainer.style.display = 'block';
+    watchlistContainer.style.display = 'none';
+    if (sectionHeader) sectionHeader.style.display = 'flex';
+    if (tab === 'cloud') {
+      loadCloudDeals();
+    } else {
+      loadLocalDeals();
+    }
   }
 }
 
@@ -516,4 +539,226 @@ function sanitizeUrl(url) {
   } catch {
     return '#';
   }
+}
+
+// ============================================================================
+// Watchlist Tab Functions
+// ============================================================================
+
+async function loadWatchlistTab() {
+  const container = document.getElementById('watchlist-container');
+  container.innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <span>Loading watchlist...</span>
+    </div>
+  `;
+
+  await loadFilters();
+  loadWatchlistAlerts();
+  renderWatchlistTab();
+}
+
+async function loadFilters() {
+  if (!authToken) {
+    watchlistFilters = [];
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/watchlist/filters`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      watchlistFilters = data.filters || [];
+      // Sync to local storage for content script
+      chrome.storage.local.set({ watchlistFilters });
+    }
+  } catch (error) {
+    console.error('[FlipChecker] Failed to load watchlist filters:', error);
+  }
+}
+
+function loadWatchlistAlerts() {
+  chrome.storage.local.get(['watchlistAlerts'], (result) => {
+    watchlistAlerts = result.watchlistAlerts || [];
+    if (currentTab === 'watchlist') {
+      renderWatchlistAlerts();
+    }
+  });
+}
+
+function renderWatchlistTab() {
+  const container = document.getElementById('watchlist-container');
+
+  const filterFormHtml = `
+    <div class="filter-form" id="filter-form">
+      <div class="filter-form-title">Add Watchlist Filter</div>
+      <input type="text" class="filter-input" id="filter-keywords" placeholder="Keywords (e.g. nintendo switch)" />
+      <div class="filter-row">
+        <input type="number" class="filter-input" id="filter-max-price" placeholder="Max buy price ($)" min="1" />
+        <input type="number" class="filter-input" id="filter-min-profit" placeholder="Min profit ($)" min="0" />
+      </div>
+      <button class="filter-save-btn" id="filter-save-btn">Save Filter</button>
+    </div>
+  `;
+
+  const filtersListHtml = watchlistFilters.length > 0
+    ? `<div class="watchlist-section-title">Active Filters</div>` +
+      watchlistFilters.map(f => createFilterCard(f)).join('')
+    : '';
+
+  container.innerHTML = filterFormHtml + filtersListHtml + `
+    <div class="watchlist-section-title">
+      Recent Alerts
+      ${watchlistAlerts.length > 0 ? '<button class="clear-alerts-btn" id="clear-alerts-btn">Clear All</button>' : ''}
+    </div>
+    <div id="alerts-list"></div>
+  `;
+
+  // Wire up save button
+  document.getElementById('filter-save-btn').addEventListener('click', saveFilter);
+
+  // Wire up delete buttons on filters
+  container.querySelectorAll('.filter-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteFilter(btn.dataset.id));
+  });
+
+  // Wire up clear alerts
+  const clearBtn = document.getElementById('clear-alerts-btn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', clearWatchlistAlerts);
+  }
+
+  renderWatchlistAlerts();
+}
+
+function createFilterCard(filter) {
+  return `
+    <div class="filter-card">
+      <div class="filter-info">
+        <div class="filter-keywords">${escapeHtml(filter.keywords)}</div>
+        <div class="filter-details">Max: $${Number(filter.max_buy_price).toLocaleString()} | Min profit: $${Number(filter.min_profit).toLocaleString()}</div>
+      </div>
+      <button class="filter-delete-btn" data-id="${escapeHtml(String(filter.id))}">&times;</button>
+    </div>
+  `;
+}
+
+function renderWatchlistAlerts() {
+  const alertsList = document.getElementById('alerts-list');
+  if (!alertsList) return;
+
+  if (watchlistAlerts.length === 0) {
+    alertsList.innerHTML = `
+      <div class="empty-state" style="padding: 20px;">
+        <div class="empty-text" style="font-size: 13px;">No alerts yet</div>
+        <div class="empty-hint">Alerts appear when the scanner finds matching deals while you browse FB Marketplace</div>
+      </div>
+    `;
+    return;
+  }
+
+  // Sort by profit descending
+  const sorted = [...watchlistAlerts].sort((a, b) => (b.profit || 0) - (a.profit || 0));
+
+  alertsList.innerHTML = sorted.map(alert => `
+    <div class="alert-card">
+      <div class="alert-title" title="${escapeHtml(alert.title)}">${escapeHtml(alert.title)}</div>
+      <div class="alert-meta">
+        <span class="alert-price">$${Number(alert.price).toLocaleString()}</span>
+        <span class="alert-profit">+$${alert.profit} profit</span>
+      </div>
+      <a href="${sanitizeUrl(alert.url)}" target="_blank" rel="noopener" class="alert-link">View on FB</a>
+    </div>
+  `).join('');
+}
+
+async function saveFilter() {
+  const keywords = document.getElementById('filter-keywords')?.value?.trim();
+  const maxPrice = parseFloat(document.getElementById('filter-max-price')?.value);
+  const minProfit = parseFloat(document.getElementById('filter-min-profit')?.value);
+
+  if (!keywords) {
+    showError('Please enter keywords for your filter.');
+    return;
+  }
+  if (isNaN(maxPrice) || maxPrice <= 0) {
+    showError('Please enter a valid max buy price.');
+    return;
+  }
+  if (isNaN(minProfit) || minProfit < 0) {
+    showError('Please enter a valid min profit.');
+    return;
+  }
+
+  if (!authToken) {
+    showError('Please sign in to save filters.');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/watchlist/filters`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        keywords,
+        max_buy_price: maxPrice,
+        min_profit: minProfit
+      })
+    });
+
+    if (response.status === 403) {
+      const data = await response.json();
+      showError(data.error || 'Filter limit reached. Upgrade for more.');
+      return;
+    }
+
+    if (!response.ok) {
+      const data = await response.json();
+      showError(data.error || 'Failed to save filter.');
+      return;
+    }
+
+    hideError();
+    await loadFilters();
+    renderWatchlistTab();
+  } catch (error) {
+    console.error('[FlipChecker] Failed to save filter:', error);
+    showError('Failed to save filter. Check your connection.');
+  }
+}
+
+async function deleteFilter(filterId) {
+  if (!authToken || !filterId) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/watchlist/filters?id=${filterId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    if (response.ok) {
+      hideError();
+      await loadFilters();
+      renderWatchlistTab();
+    } else {
+      showError('Failed to delete filter.');
+    }
+  } catch (error) {
+    console.error('[FlipChecker] Failed to delete filter:', error);
+    showError('Failed to delete filter. Check your connection.');
+  }
+}
+
+function clearWatchlistAlerts() {
+  chrome.storage.local.set({ watchlistAlerts: [] }, () => {
+    watchlistAlerts = [];
+    renderWatchlistAlerts();
+  });
 }

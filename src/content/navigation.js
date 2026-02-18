@@ -90,6 +90,8 @@ export function handleNavigation() {
   } else {
     // Clean up when leaving marketplace item page
     removeOverlayElements();
+    // Notify callbacks for non-item pages (e.g., search pages)
+    notifyCallbacks(currentUrl, null);
   }
 }
 
