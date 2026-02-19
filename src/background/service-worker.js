@@ -1,7 +1,7 @@
 // FlipChecker - Background Service Worker
 
 // API base URL
-const API_BASE_URL = 'https://flipchecker.io';
+const API_BASE_URL = 'https://www.flipchecker.io';
 
 // Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -124,11 +124,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Listen for tab updates to catch auth callback
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url && changeInfo.url.includes('/auth/extension/callback')) {
-    // Validate the callback URL origin matches our API
+    // Validate the callback URL origin matches our API (normalize www vs non-www)
     try {
       const urlObj = new URL(changeInfo.url);
-      const apiOrigin = new URL(API_BASE_URL).origin;
-      if (urlObj.origin !== apiOrigin) {
+      const apiObj = new URL(API_BASE_URL);
+      const normalizeHost = (h) => h.replace(/^www\./, '');
+      if (urlObj.protocol !== apiObj.protocol || normalizeHost(urlObj.hostname) !== normalizeHost(apiObj.hostname)) {
         console.warn('[FlipChecker] Auth callback blocked from unexpected origin:', urlObj.origin);
         return;
       }
@@ -145,18 +146,23 @@ async function handleAuthCallback(url, tabId) {
   try {
     const urlObj = new URL(url);
     const token = urlObj.searchParams.get('token');
+    const refreshToken = urlObj.searchParams.get('refresh_token');
     const userJson = urlObj.searchParams.get('user');
 
     if (token) {
       const user = userJson ? JSON.parse(decodeURIComponent(userJson)) : null;
 
-      // Store the token and user info
-      await chrome.storage.local.set({
+      // Store the token, refresh token, and user info
+      const storageData = {
         authToken: token,
         user: user
-      });
+      };
+      if (refreshToken) {
+        storageData.refreshToken = refreshToken;
+      }
+      await chrome.storage.local.set(storageData);
 
-      console.log('[FlipChecker] Auth successful, token stored');
+      console.log('[FlipChecker] Auth successful, token stored (refresh token:', !!refreshToken, ')');
 
       // Close the auth tab and show success
       chrome.tabs.remove(tabId);
@@ -169,28 +175,69 @@ async function handleAuthCallback(url, tabId) {
   }
 }
 
-// Periodic token refresh (check if token is still valid)
+// Periodic token refresh — use refresh_token to get a new access token
 chrome.alarms.create('tokenRefresh', { periodInMinutes: 30 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'tokenRefresh') {
-    const result = await chrome.storage.local.get(['authToken']);
-    if (result.authToken) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/usage`, {
-          headers: {
-            'Authorization': `Bearer ${result.authToken}`
-          }
+    const result = await chrome.storage.local.get(['authToken', 'refreshToken', 'user']);
+    if (!result.authToken) return;
+
+    try {
+      // First check if current token is still valid
+      const checkResponse = await fetch(`${API_BASE_URL}/api/usage`, {
+        headers: {
+          'Authorization': `Bearer ${result.authToken}`
+        }
+      });
+
+      if (checkResponse.ok) {
+        console.log('[FlipChecker] Token still valid');
+        return;
+      }
+
+      if (checkResponse.status === 401 && result.refreshToken) {
+        // Token expired — attempt refresh via Supabase
+        console.log('[FlipChecker] Token expired, attempting refresh...');
+        const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: result.refreshToken })
         });
 
-        if (response.status === 401) {
-          // Token expired, clear it
-          await chrome.storage.local.remove(['authToken', 'user']);
-          console.log('[FlipChecker] Token expired, cleared');
+        if (refreshResponse.ok) {
+          const data = await refreshResponse.json();
+          if (data.access_token) {
+            const storageUpdate = { authToken: data.access_token };
+            if (data.refresh_token) {
+              storageUpdate.refreshToken = data.refresh_token;
+            }
+            await chrome.storage.local.set(storageUpdate);
+            console.log('[FlipChecker] Token refreshed successfully');
+
+            // Notify content scripts about the new token
+            chrome.tabs.query({ url: '*://www.facebook.com/marketplace/*' }, (tabs) => {
+              tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                  type: 'authSuccess',
+                  user: result.user
+                }).catch(() => {});
+              });
+            });
+            return;
+          }
         }
-      } catch (error) {
-        console.error('[FlipChecker] Token refresh check failed:', error);
+
+        // Refresh failed — clear auth
+        console.log('[FlipChecker] Token refresh failed, clearing auth');
+        await chrome.storage.local.remove(['authToken', 'refreshToken', 'user']);
+      } else if (checkResponse.status === 401) {
+        // No refresh token available — clear auth
+        console.log('[FlipChecker] Token expired, no refresh token available');
+        await chrome.storage.local.remove(['authToken', 'user']);
       }
+    } catch (error) {
+      console.error('[FlipChecker] Token refresh check failed:', error);
     }
   }
 });
