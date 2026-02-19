@@ -26,7 +26,7 @@ export async function fetchPriceData(title) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
       },
-      body: { title }
+      body: { query: title }
     }, (response) => {
       if (chrome.runtime.lastError) {
         console.error('[FlipChecker] Price lookup message error:', chrome.runtime.lastError);
@@ -54,7 +54,19 @@ export async function fetchPriceData(title) {
         return;
       }
 
-      resolve(response.data);
+      // Map API response to the format the overlay expects
+      const d = response.data;
+      resolve({
+        source: d.source,
+        ebay_low: d.prices?.low,
+        ebay_high: d.prices?.high,
+        ebay_avg: d.prices?.avg,
+        ebay_median: d.prices?.median,
+        sample_count: d.prices?.sample_count,
+        samples: d.samples,
+        ebay_url: d.ebay_search_url,
+        usage: d.usage
+      });
     });
   });
 }
@@ -94,7 +106,7 @@ export async function saveDealToApi(data, priceData) {
         location: data.location,
         sellerName: data.seller,
         images: data.images || (data.imageUrl ? [data.imageUrl] : null),
-        priceData: priceData ? {
+        priceData: (priceData && !priceData.error) ? {
           ebayLow: priceData.ebay_low,
           ebayHigh: priceData.ebay_high,
           ebayAvg: priceData.ebay_avg
