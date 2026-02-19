@@ -78,12 +78,17 @@ export async function initAuth() {
           // Can't decode — assume it might be valid
         }
 
-        if (isExpired && result.refreshToken) {
-          console.log('[FlipChecker] Stored token expired, refreshing...');
-          const refreshed = await tryRefreshToken();
-          if (!refreshed) {
-            console.log('[FlipChecker] Refresh failed, clearing auth');
-            chrome.storage.local.remove(['authToken', 'refreshToken', 'user']);
+        if (isExpired) {
+          if (result.refreshToken) {
+            console.log('[FlipChecker] Stored token expired, refreshing...');
+            const refreshed = await tryRefreshToken();
+            if (!refreshed) {
+              console.log('[FlipChecker] Refresh failed, clearing auth');
+              chrome.storage.local.remove(['authToken', 'refreshToken', 'user']);
+            }
+          } else {
+            console.log('[FlipChecker] Stored token expired, no refresh token — please re-login');
+            chrome.storage.local.remove(['authToken', 'user']);
           }
         } else {
           setState({
