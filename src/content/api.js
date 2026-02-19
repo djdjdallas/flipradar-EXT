@@ -86,12 +86,19 @@ export async function saveDealToApi(data, priceData) {
         'Authorization': `Bearer ${authToken}`
       },
       body: {
-        source_url: window.location.href,
-        user_title: data.title,
-        user_asking_price: data.price,
-        ebay_estimate_low: priceData?.ebay_low,
-        ebay_estimate_high: priceData?.ebay_high,
-        ebay_search_url: priceData?.ebay_url || getEbayUrl(data.title)
+        url: window.location.href,
+        title: data.title,
+        price: data.price,
+        itemId: data.itemId,
+        extractionMethod: data.source,
+        location: data.location,
+        sellerName: data.seller,
+        images: data.images || (data.imageUrl ? [data.imageUrl] : null),
+        priceData: priceData ? {
+          ebayLow: priceData.ebay_low,
+          ebayHigh: priceData.ebay_high,
+          ebayAvg: priceData.ebay_avg
+        } : null
       }
     }, (response) => {
       if (chrome.runtime.lastError) {
@@ -135,6 +142,7 @@ export function saveDealLocally(data) {
     title: data.title || 'Unknown Item',
     price: data.price,
     url: window.location.href,
+    imageUrl: data.imageUrl || (data.images && data.images[0]) || null,
     ebayUrl: getEbayUrl(data.title),
     savedAt: new Date().toISOString()
   };

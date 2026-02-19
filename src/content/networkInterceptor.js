@@ -79,6 +79,7 @@ function parseGraphQLResponse(response) {
         priceFormatted: listing.listing_price?.formatted_amount,
         location: listing.location_text?.text,
         seller: listing.story?.comet_sections?.seller?.seller?.name,
+        images: listing.listing_photos?.map(p => p.image?.uri).filter(Boolean),
         source: 'graphql'
       };
     }
@@ -93,6 +94,7 @@ function parseGraphQLResponse(response) {
         priceFormatted: product.price?.formatted,
         location: product.location,
         seller: product.seller?.name,
+        images: product.images?.map(i => i.uri || i.url).filter(Boolean),
         source: 'graphql'
       };
     }

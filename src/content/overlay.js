@@ -12,50 +12,58 @@ import { getItemId } from './scraper.js';
 
 /**
  * Get the overlay styles (embedded in Shadow DOM)
+ * Neo-Brutalism design system
  * @returns {string} - CSS styles
  */
 function getOverlayStyles() {
   return `
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
       * {
         box-sizing: border-box;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       }
       .container {
-        background: #1a1a2e;
-        color: #ffffff;
-        padding: 16px;
-        border-radius: 12px;
-        width: 300px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-        border: 1px solid #2d2d44;
+        background: #F8F4E8;
+        color: #09090B;
+        padding: 0;
+        width: 310px;
+        border: 2px solid #09090B;
+        box-shadow: 4px 4px 0px #09090B;
       }
       .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #2d2d44;
+        padding: 12px 16px;
+        border-bottom: 2px solid #09090B;
+        background: #09090B;
       }
       .logo {
-        font-weight: 700;
+        font-family: 'Dela Gothic One', cursive;
+        font-weight: 400;
         font-size: 14px;
-        color: #4ade80;
+        color: #D2E823;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
       .tier-badge {
-        font-size: 10px;
+        font-size: 9px;
         padding: 2px 6px;
-        border-radius: 4px;
-        background: #374151;
-        color: #9ca3af;
+        background: #D2E823;
+        color: #09090B;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border: 1px solid #09090B;
       }
-      .tier-flipper { background: #1e40af; color: #93c5fd; }
-      .tier-pro { background: #7c3aed; color: #c4b5fd; }
+      .tier-flipper { background: #D2E823; color: #09090B; }
+      .tier-pro { background: #D2E823; color: #09090B; }
       .close-btn {
         background: none;
         border: none;
-        color: #888;
+        color: #ffffff50;
         cursor: pointer;
         font-size: 18px;
         padding: 0;
@@ -63,173 +71,232 @@ function getOverlayStyles() {
       }
       .close-btn:hover { color: #fff; }
       .price-section {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        border-bottom: 2px solid #09090B;
+      }
+      .listing-image {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border: 2px solid #09090B;
+        flex-shrink: 0;
+      }
+      .price-info {
+        flex: 1;
+        min-width: 0;
         text-align: center;
-        margin-bottom: 12px;
       }
       .current-price {
+        font-family: 'Dela Gothic One', cursive;
         font-size: 32px;
-        font-weight: 700;
-        color: #fff;
+        font-weight: 400;
+        color: #09090B;
       }
       .title {
         font-size: 12px;
-        color: #888;
+        color: #09090B99;
         margin-top: 4px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .warning {
-        background: #7f1d1d;
-        color: #fca5a5;
-        padding: 8px;
-        border-radius: 6px;
+      .alert-match {
+        background: #D2E82340;
+        color: #09090B;
+        padding: 8px 16px;
         font-size: 12px;
-        margin-bottom: 12px;
+        font-weight: 700;
+        border-bottom: 2px solid #09090B;
+        text-align: center;
+        border-left: 4px solid #D2E823;
+      }
+      .alert-match-icon {
+        margin-right: 4px;
+      }
+      .warning {
+        background: #fef2f2;
+        color: #dc2626;
+        padding: 8px 16px;
+        font-size: 12px;
+        font-weight: 600;
+        border-bottom: 2px solid #09090B;
         text-align: center;
       }
       .login-prompt {
-        background: #1e3a5f;
-        color: #93c5fd;
-        padding: 12px;
-        border-radius: 8px;
+        background: #fff;
+        color: #09090B;
+        padding: 12px 16px;
         font-size: 12px;
-        margin-bottom: 12px;
+        border-bottom: 2px solid #09090B;
         text-align: center;
       }
       .login-btn {
-        background: #3b82f6;
-        color: #fff;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
+        background: #09090B;
+        color: #D2E823;
+        border: 2px solid #09090B;
+        padding: 6px 14px;
         font-size: 12px;
-        font-weight: 600;
+        font-weight: 700;
         cursor: pointer;
         margin-top: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: transform 0.1s, box-shadow 0.1s;
+        box-shadow: 2px 2px 0px #09090B;
       }
-      .login-btn:hover { background: #2563eb; }
+      .login-btn:hover {
+        transform: translate(1px, 1px);
+        box-shadow: 1px 1px 0px #09090B;
+      }
       .upgrade-prompt {
-        background: #3d1f5c;
-        color: #c4b5fd;
-        padding: 12px;
-        border-radius: 8px;
+        background: #fff;
+        color: #09090B;
+        padding: 12px 16px;
         font-size: 12px;
-        margin-bottom: 12px;
+        border-bottom: 2px solid #09090B;
         text-align: center;
       }
       .upgrade-btn {
-        background: #7c3aed;
-        color: #fff;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
+        background: #D2E823;
+        color: #09090B;
+        border: 2px solid #09090B;
+        padding: 6px 14px;
         font-size: 12px;
-        font-weight: 600;
+        font-weight: 700;
         cursor: pointer;
         margin-top: 8px;
-      }
-      .upgrade-btn:hover { background: #6d28d9; }
-      .ebay-section {
-        background: #16213e;
-        padding: 12px;
-        border-radius: 8px;
-        margin-bottom: 12px;
-      }
-      .ebay-label {
-        font-size: 11px;
-        color: #888;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        transition: transform 0.1s, box-shadow 0.1s;
+        box-shadow: 2px 2px 0px #09090B;
+      }
+      .upgrade-btn:hover {
+        transform: translate(1px, 1px);
+        box-shadow: 1px 1px 0px #09090B;
+      }
+      .ebay-section {
+        background: #fff;
+        padding: 12px 16px;
+        border-bottom: 2px solid #09090B;
+      }
+      .ebay-label {
+        font-size: 10px;
+        color: #09090B80;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
         margin-bottom: 4px;
       }
       .ebay-range {
+        font-family: 'Dela Gothic One', cursive;
         font-size: 18px;
-        font-weight: 600;
-        color: #4ade80;
+        font-weight: 400;
+        color: #09090B;
       }
       .source-tag {
         font-size: 10px;
-        color: #666;
+        color: #09090B60;
         margin-top: 4px;
+        font-weight: 600;
       }
       .profit-section {
-        background: #16213e;
-        padding: 12px;
-        border-radius: 8px;
-        margin-bottom: 12px;
+        background: #fff;
+        padding: 12px 16px;
+        border-bottom: 2px solid #09090B;
       }
       .profit-label {
-        font-size: 11px;
-        color: #888;
+        font-size: 10px;
+        color: #09090B80;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 1px;
+        font-weight: 700;
         margin-bottom: 4px;
       }
       .profit-range {
+        font-family: 'Dela Gothic One', cursive;
         font-size: 18px;
-        font-weight: 600;
+        font-weight: 400;
       }
-      .profit-positive { color: #4ade80; }
-      .profit-negative { color: #f87171; }
-      .profit-mixed { color: #fbbf24; }
+      .profit-positive { color: #16a34a; }
+      .profit-negative { color: #dc2626; }
+      .profit-mixed { color: #ca8a04; }
       .meta {
         font-size: 11px;
-        color: #666;
-        margin-bottom: 12px;
+        color: #09090B80;
+        padding: 8px 16px;
+        border-bottom: 2px solid #09090B;
       }
-      .meta-item { margin-bottom: 2px; }
+      .meta-item { margin-bottom: 2px; font-weight: 500; }
       .buttons {
         display: flex;
         flex-direction: column;
         gap: 8px;
+        padding: 12px 16px;
       }
       .btn {
         padding: 10px 16px;
-        border-radius: 8px;
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 700;
         cursor: pointer;
-        border: none;
         text-align: center;
         text-decoration: none;
         display: block;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border: 2px solid #09090B;
+        transition: transform 0.1s, box-shadow 0.1s;
+        box-shadow: 2px 2px 0px #09090B;
       }
-      .btn-primary { background: #3b82f6; color: #fff; }
-      .btn-primary:hover { background: #2563eb; }
-      .btn-secondary { background: #374151; color: #fff; }
-      .btn-secondary:hover { background: #4b5563; }
-      .btn-success { background: #16a34a; color: #fff; }
-      .btn-success:hover { background: #15803d; }
+      .btn:hover {
+        transform: translate(1px, 1px);
+        box-shadow: 1px 1px 0px #09090B;
+      }
+      .btn-primary {
+        background: #09090B;
+        color: #D2E823;
+      }
+      .btn-secondary {
+        background: #fff;
+        color: #09090B;
+      }
+      .btn-success {
+        background: #D2E823;
+        color: #09090B;
+      }
       .btn:disabled { opacity: 0.5; cursor: not-allowed; }
       .saved-msg {
         text-align: center;
         font-size: 12px;
-        margin-top: 8px;
+        font-weight: 700;
+        padding: 0 16px;
         display: none;
       }
-      .saved-msg.success { color: #4ade80; }
-      .saved-msg.error { color: #f87171; }
+      .saved-msg.success { color: #16a34a; }
+      .saved-msg.error { color: #dc2626; }
       .footer {
-        margin-top: 12px;
-        padding-top: 8px;
-        border-top: 1px solid #2d2d44;
+        padding: 8px 16px;
+        border-top: 2px solid #09090B;
         font-size: 10px;
-        color: #666;
+        color: #09090B60;
         text-align: center;
+        font-weight: 600;
       }
       .loading {
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 20px;
-        color: #888;
+        color: #09090B80;
+        font-weight: 600;
       }
       .spinner {
         width: 20px;
         height: 20px;
-        border: 2px solid #374151;
-        border-top-color: #4ade80;
+        border: 2px solid #09090B20;
+        border-top-color: #D2E823;
         border-radius: 50%;
         animation: spin 1s linear infinite;
         margin-right: 8px;
@@ -238,43 +305,46 @@ function getOverlayStyles() {
       .samples {
         margin-top: 8px;
         padding-top: 8px;
-        border-top: 1px solid #2d2d44;
+        border-top: 2px solid #09090B20;
       }
       .sample-item {
         font-size: 11px;
-        color: #888;
+        color: #09090B80;
         margin-bottom: 4px;
         display: flex;
         justify-content: space-between;
+        font-weight: 500;
       }
-      .sample-price { color: #4ade80; }
+      .sample-price { color: #09090B; font-weight: 700; }
       .ebay-section.real-data {
-        background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
-        border: 1px solid #10b981;
+        background: #D2E82320;
+        border-left: 4px solid #D2E823;
       }
       .real-badge {
-        background: #10b981;
-        color: #fff;
+        background: #D2E823;
+        color: #09090B;
         padding: 2px 6px;
-        border-radius: 4px;
         font-size: 9px;
         font-weight: 700;
         margin-right: 4px;
+        border: 1px solid #09090B;
       }
       .ebay-stats-row {
         display: flex;
         justify-content: space-between;
         font-size: 12px;
-        color: #a7f3d0;
+        color: #09090B80;
         margin-top: 4px;
+        font-weight: 600;
       }
       .get-real-data {
         margin-top: 8px;
         padding-top: 8px;
-        border-top: 1px solid #2d2d44;
+        border-top: 2px solid #09090B20;
         font-size: 11px;
-        color: #fbbf24;
+        color: #09090B80;
         text-align: center;
+        font-weight: 600;
       }
     </style>
   `;
@@ -302,7 +372,7 @@ function getTierBadge() {
  * @param {object} data - Listing data (title, price, location, etc.)
  * @param {object} priceData - eBay price lookup data (or null)
  */
-export async function createOverlay(data, priceData = null) {
+export async function createOverlay(data, priceData = null, alertMatches = []) {
   // Verify we're still on the same item before showing overlay
   const currentItemId = getItemId();
   if (data.itemId && data.itemId !== currentItemId) {
@@ -343,20 +413,29 @@ export async function createOverlay(data, priceData = null) {
   const ebayUrl = priceData?.ebay_url || getEbayUrl(data.title);
   const tierBadge = getTierBadge();
 
+  // Resolve image URL from various extraction sources
+  const imageUrl = data.imageUrl || (data.images && data.images[0]) || null;
+
   // Build HTML
   let html = `
     ${getOverlayStyles()}
     <div class="container">
       <div class="header">
-        <span class="logo">FlipChecker ${tierBadge}</span>
+        <span class="logo">FLIPCHECKER ${tierBadge}</span>
         <button class="close-btn" id="close-overlay">&times;</button>
       </div>
 
       <div class="price-section">
-        <div class="current-price">${formatPrice(data.price)}</div>
-        <div class="title" title="${escapeHtml(data.title || '')}">${escapeHtml(data.title) || 'Unknown Item'}</div>
+        ${imageUrl ? `<img class="listing-image" src="${sanitizeUrl(imageUrl)}" alt="" />` : ''}
+        <div class="price-info">
+          <div class="current-price">${formatPrice(data.price)}</div>
+          <div class="title" title="${escapeHtml(data.title || '')}">${escapeHtml(data.title) || 'Unknown Item'}</div>
+        </div>
       </div>
 
+      ${alertMatches.length > 0 ? alertMatches.map(a =>
+        `<div class="alert-match"><span class="alert-match-icon">🔔</span> ALERT MATCH: ${escapeHtml(a.search_query)}${a.max_price ? ` — under $${a.max_price}` : ''}!</div>`
+      ).join('') : ''}
       ${suspicious ? '<div class="warning">Warning: Price seems suspiciously low</div>' : ''}
   `;
 
@@ -364,7 +443,7 @@ export async function createOverlay(data, priceData = null) {
   if (!loggedIn) {
     html += `
       <div class="login-prompt">
-        <div>Sign in for real eBay price data</div>
+        <div style="font-weight: 700;">Sign in for real eBay price data</div>
         <button class="login-btn" id="login-btn">Sign In Free</button>
       </div>
     `;
@@ -374,7 +453,7 @@ export async function createOverlay(data, priceData = null) {
   if (needsUpgrade) {
     html += `
       <div class="upgrade-prompt">
-        <div>Daily lookup limit reached</div>
+        <div style="font-weight: 700;">Daily lookup limit reached</div>
         <button class="upgrade-btn" id="upgrade-btn">Upgrade for More</button>
       </div>
     `;
@@ -423,12 +502,15 @@ export async function createOverlay(data, priceData = null) {
 
     // Profit section with real data
     if (profitLow !== null) {
+      const roiLow = data.price ? Math.round((profitLow / data.price) * 100) : null;
+      const roiHigh = data.price ? Math.round((profitHigh / data.price) * 100) : null;
       html += `
         <div class="profit-section">
           <div class="profit-label">Est. Profit (after fees)</div>
           <div class="profit-range ${profitClass}">
             ${profitLow >= 0 ? '+' : ''}$${profitLow} to ${profitHigh >= 0 ? '+' : ''}$${profitHigh}
           </div>
+          ${roiLow !== null ? `<div class="source-tag">ROI: ${roiLow}% – ${roiHigh}%</div>` : ''}
         </div>
       `;
     }
@@ -464,12 +546,15 @@ export async function createOverlay(data, priceData = null) {
 
     // Profit section
     if (profitLow !== null) {
+      const roiLow = data.price ? Math.round((profitLow / data.price) * 100) : null;
+      const roiHigh = data.price ? Math.round((profitHigh / data.price) * 100) : null;
       html += `
         <div class="profit-section">
           <div class="profit-label">Est. Profit (after fees)</div>
           <div class="profit-range ${profitClass}">
             ${profitLow >= 0 ? '+' : ''}$${profitLow} to ${profitHigh >= 0 ? '+' : ''}$${profitHigh}
           </div>
+          ${roiLow !== null ? `<div class="source-tag">ROI: ${roiLow}% – ${roiHigh}%</div>` : ''}
         </div>
       `;
     }
@@ -515,7 +600,7 @@ export async function createOverlay(data, priceData = null) {
 
   // eBay attribution footer
   html += `
-    <div class="footer" style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #2d2d44; font-size: 10px; color: #666; text-align: center;">
+    <div class="footer">
       Pricing data powered by eBay. eBay and the eBay logo are trademarks of eBay Inc.
     </div>
   `;
@@ -588,38 +673,49 @@ export function createLoadingOverlay(data) {
 
   shadow.innerHTML = `
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
       * {
         box-sizing: border-box;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       }
       .container {
-        background: #1a1a2e;
-        color: #ffffff;
-        padding: 16px;
-        border-radius: 12px;
-        width: 300px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-        border: 1px solid #2d2d44;
+        background: #F8F4E8;
+        color: #09090B;
+        padding: 0;
+        width: 310px;
+        border: 2px solid #09090B;
+        box-shadow: 4px 4px 0px #09090B;
       }
       .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
+        padding: 12px 16px;
+        border-bottom: 2px solid #09090B;
+        background: #09090B;
       }
-      .logo { font-weight: 700; font-size: 14px; color: #4ade80; }
+      .logo {
+        font-family: 'Dela Gothic One', cursive;
+        font-weight: 400;
+        font-size: 14px;
+        color: #D2E823;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
       .loading {
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 40px;
-        color: #888;
+        color: #09090B80;
+        font-weight: 600;
       }
       .spinner {
         width: 24px;
         height: 24px;
-        border: 2px solid #374151;
-        border-top-color: #4ade80;
+        border: 2px solid #09090B20;
+        border-top-color: #D2E823;
         border-radius: 50%;
         animation: spin 1s linear infinite;
         margin-right: 12px;
@@ -628,7 +724,7 @@ export function createLoadingOverlay(data) {
     </style>
     <div class="container">
       <div class="header">
-        <span class="logo">FlipChecker</span>
+        <span class="logo">FLIPCHECKER</span>
       </div>
       <div class="loading">
         <div class="spinner"></div>
@@ -663,23 +759,34 @@ export function showTriggerButton(onClick) {
 
   const btn = document.createElement('button');
   btn.id = TRIGGER_BUTTON_ID;
-  btn.innerHTML = '💰 Check Flip';
+  btn.innerHTML = '💰 CHECK FLIP';
   btn.style.cssText = `
     position: fixed;
     bottom: 80px;
     right: 20px;
     z-index: 2147483646;
-    background: #4ade80;
-    color: #1a1a2e;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #D2E823;
+    color: #09090B;
+    border: 2px solid #09090B;
+    padding: 10px 18px;
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 3px 3px 0px #09090B;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: transform 0.1s, box-shadow 0.1s;
   `;
+
+  btn.addEventListener('mouseenter', () => {
+    btn.style.transform = 'translate(1px, 1px)';
+    btn.style.boxShadow = '2px 2px 0px #09090B';
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.transform = 'translate(0, 0)';
+    btn.style.boxShadow = '3px 3px 0px #09090B';
+  });
 
   btn.addEventListener('click', () => {
     btn.remove();

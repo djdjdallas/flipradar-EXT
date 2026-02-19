@@ -23,6 +23,7 @@ import { extractWithVision, transformVisionData } from './visionExtractor.js';
 import { fetchPriceData } from './api.js';
 import { initAuth, onAuthSuccess, onSoldDataReceived, isLoggedIn } from './auth.js';
 import { createOverlay, createLoadingOverlay, showTriggerButton } from './overlay.js';
+import { checkAlerts } from './alertChecker.js';
 import { isSearchResultsPage } from './searchScraper.js';
 import { initWatchlistScanner, cleanupWatchlistScanner } from './watchlistScanner.js';
 
@@ -184,8 +185,14 @@ async function initOverlay() {
     }
   }
 
+  // Check alerts (fire-and-forget match saves, but pass matches to overlay)
+  let alertMatches = [];
+  if (isLoggedIn() && data.title) {
+    alertMatches = await checkAlerts(data);
+  }
+
   // Create the full overlay
-  await createOverlay(data, priceData);
+  await createOverlay(data, priceData, alertMatches);
   endJob(jobId);
 }
 
@@ -208,7 +215,7 @@ let cleanupSoldDataListener = null;
 /**
  * Main initialization
  */
-function init() {
+async function init() {
   if (initialized) {
     console.log('[FlipChecker] Already initialized, skipping');
     return;
@@ -220,6 +227,9 @@ function init() {
 
   // Setup network interception early (before navigation to capture initial data)
   setupNetworkInterception();
+
+  // Pre-initialize auth state so it's ready before user clicks "Check Flip"
+  await initAuth();
 
   // Setup navigation detection
   initNavigation();
