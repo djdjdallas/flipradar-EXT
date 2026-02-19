@@ -106,6 +106,7 @@ export async function saveDealToApi(data, priceData) {
         location: data.location,
         sellerName: data.seller,
         images: data.images || (data.imageUrl ? [data.imageUrl] : null),
+        ebay_search_url: (priceData && !priceData.error) ? priceData.ebay_url || null : null,
         priceData: (priceData && !priceData.error) ? {
           ebayLow: priceData.ebay_low,
           ebayHigh: priceData.ebay_high,
