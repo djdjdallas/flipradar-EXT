@@ -275,6 +275,7 @@ function getOverlayStyles() {
         display: none;
       }
       .saved-msg.success { color: #16a34a; }
+      .saved-msg.local { color: #ca8a04; }
       .saved-msg.error { color: #dc2626; }
       .footer {
         padding: 8px 16px;
@@ -395,12 +396,15 @@ export async function createOverlay(data, priceData = null, alertMatches = []) {
   const loggedIn = isLoggedIn();
   const needsUpgrade = priceData?.error === 'limit_reached';
 
+  // Determine if API returned actual price data (not just a successful empty response)
+  const hasEbayPrices = hasApiData && priceData.ebay_low != null && priceData.ebay_high != null;
+
   // Calculate profit
   let profitLow = null;
   let profitHigh = null;
   let profitClass = 'profit-positive';
 
-  if (hasApiData && data.price) {
+  if (hasEbayPrices && data.price) {
     const profit = calculateProfit(data.price, priceData.ebay_low, priceData.ebay_high);
     profitLow = profit.low;
     profitHigh = profit.high;
@@ -514,8 +518,8 @@ export async function createOverlay(data, priceData = null, alertMatches = []) {
         </div>
       `;
     }
-  } else if (hasApiData) {
-    // Show API estimate data
+  } else if (hasApiData && hasEbayPrices) {
+    // Show API estimate data with actual prices
     const sourceLabels = {
       estimate: 'Basic estimate',
       ebay_active: 'eBay active listings',
@@ -558,6 +562,15 @@ export async function createOverlay(data, priceData = null, alertMatches = []) {
         </div>
       `;
     }
+  } else if (hasApiData && !hasEbayPrices) {
+    // API returned successfully but no eBay listings found
+    html += `
+      <div class="ebay-section">
+        <div class="ebay-label">Est. eBay Value</div>
+        <div class="ebay-range" style="font-size: 14px; color: #09090B80;">No eBay data found</div>
+        <div class="source-tag">Try searching eBay manually below</div>
+      </div>
+    `;
   } else if (!loggedIn || needsUpgrade) {
     // Show basic estimate for non-logged-in users
     const basicLow = data.price ? Math.round(data.price * 0.7) : null;
@@ -640,9 +653,12 @@ export async function createOverlay(data, priceData = null, alertMatches = []) {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save Deal';
 
-    if (result.success) {
-      msg.textContent = result.local ? 'Saved locally!' : 'Deal saved!';
+    if (result.success && !result.local) {
+      msg.textContent = 'Deal saved!';
       msg.className = 'saved-msg success';
+    } else if (result.success && result.local) {
+      msg.textContent = 'Saved locally (sign in to sync)';
+      msg.className = 'saved-msg local';
     } else {
       msg.textContent = result.error || 'Failed to save';
       msg.className = 'saved-msg error';

@@ -10,10 +10,9 @@
     "alarms"
   ],
   "host_permissions": [
-    "<all_urls>",
     "*://www.facebook.com/*",
     "*://www.ebay.com/*",
-    "*://flipchecker.io/*"
+    "*://*.flipchecker.io/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -50,6 +49,12 @@
       ],
       "js": ["dist/ebay-reader.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://www.facebook.com/marketplace/*"],
+      "js": ["dist/network-interceptor-page.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ]
 }

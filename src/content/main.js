@@ -16,7 +16,8 @@ import {
   getItemId,
   isMarketplaceItemPage,
   waitForNewContent,
-  extractAllData
+  extractAllData,
+  extractImageUrl
 } from './scraper.js';
 import { extractWithAI, transformAIData } from './aiExtractor.js';
 import { extractWithVision, transformVisionData } from './visionExtractor.js';
@@ -230,6 +231,15 @@ async function init() {
 
   // Pre-initialize auth state so it's ready before user clicks "Check Flip"
   await initAuth();
+
+  // Listen for messages from popup (e.g. requesting listing image)
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'getListingImage') {
+      const imageUrl = extractImageUrl();
+      sendResponse({ imageUrl });
+    }
+    return false; // synchronous response
+  });
 
   // Setup navigation detection
   initNavigation();

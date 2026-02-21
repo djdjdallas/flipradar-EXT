@@ -8,7 +8,8 @@ const buildOptions = {
     'content': './src/content/main.js',
     'background': './src/background/service-worker.js',
     'popup': './src/popup/popup.js',
-    'ebay-reader': './src/content/ebay-reader.js'
+    'ebay-reader': './src/content/ebay-reader.js',
+    'network-interceptor-page': './src/content/networkInterceptorPage.js'
   },
   bundle: true,
   outdir: './dist',
@@ -16,6 +17,7 @@ const buildOptions = {
   target: ['chrome110'],
   sourcemap: isWatch ? 'inline' : false,
   minify: !isWatch,
+  drop: isWatch ? [] : ['console'],
   define: {
     'process.env.NODE_ENV': isWatch ? '"development"' : '"production"'
   },

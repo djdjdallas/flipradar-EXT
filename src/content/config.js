@@ -5,7 +5,7 @@ export const OVERLAY_ID = 'flipchecker-overlay';
 export const TRIGGER_BUTTON_ID = 'flipchecker-trigger';
 
 // API Configuration
-export const API_BASE_URL = 'https://flipchecker.io';
+export const API_BASE_URL = 'https://www.flipchecker.io';
 
 // Cache Configuration
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours

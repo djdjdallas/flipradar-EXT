@@ -6,9 +6,11 @@
   "scripts": {
     "build": "node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "package": "node scripts/package.js"
   },
   "devDependencies": {
+    "archiver": "^7.0.0",
     "esbuild": "^0.20.0"
   }
 }

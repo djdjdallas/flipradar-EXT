@@ -108,10 +108,64 @@ export function waitForNewContent(previousTitle, currentItemId, timeout = CONTEN
 }
 
 /**
+ * Parse item title from document.title (most reliable source)
+ * Facebook sets document.title to: "Item Name - $100 | Facebook Marketplace"
+ * @returns {string|null}
+ */
+function parseTitleFromDocumentTitle() {
+  const docTitle = document.title || '';
+  if (!docTitle) return null;
+
+  // Strip FB suffixes: " | Facebook", " | Marketplace", " - Facebook Marketplace"
+  let parsed = docTitle
+    .replace(/\s*[\|\-]\s*(Facebook|Marketplace).*$/i, '')
+    .trim();
+
+  if (!parsed || parsed.length < 5) return null;
+
+  // Strip trailing price (e.g., "Soldano 2x12 cabinet - $100")
+  const titleOnly = parsed.replace(/\s*[-–]\s*\$[\d,]+.*$/, '').trim();
+  if (titleOnly && titleOnly.length >= 5) {
+    parsed = titleOnly;
+  }
+
+  // Reject if it's a generic/non-product title
+  if (isGenericTitle(parsed) || parsed.startsWith('$') || /^\d+$/.test(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+/**
+ * Parse price from document.title
+ * @returns {number|null}
+ */
+function parsePriceFromDocumentTitle() {
+  const docTitle = document.title || '';
+  const match = docTitle.match(/\$[\d,]+/);
+  if (match) {
+    const price = parsePrice(match[0]);
+    if (price >= PRICE_MIN_VALUE) {
+      return price;
+    }
+  }
+  return null;
+}
+
+/**
  * Extract title using tiered selectors and prominence scoring
  * @returns {string|null}
  */
 export function extractTitle() {
+  // Tier 0: Parse from document.title (most reliable — same source as popup)
+  // Facebook always updates document.title on SPA navigation
+  const docTitleResult = parseTitleFromDocumentTitle();
+  if (docTitleResult) {
+    console.log('[FlipChecker] Found title via document.title:', docTitleResult);
+    return docTitleResult;
+  }
+
   // Tier 1 & 2: Try specific selectors first
   const selectors = getAllSelectors(TITLE_SELECTORS);
 
@@ -182,6 +236,13 @@ export function extractTitle() {
  * @returns {number|null}
  */
 export function extractPrice() {
+  // Strategy 0: Parse from document.title (most reliable)
+  const docPrice = parsePriceFromDocumentTitle();
+  if (docPrice) {
+    console.log('[FlipChecker] Found price via document.title:', docPrice);
+    return docPrice;
+  }
+
   // Strategy 1: Look for price near the title (h1)
   // The listing price is usually displayed prominently near the title
   const h1 = document.querySelector('h1');
@@ -324,16 +385,38 @@ export function extractDaysListed() {
 
 /**
  * Extract primary image URL
+ * Uses querySelectorAll + size filtering to skip avatars/icons/ads
+ * and find the actual product listing photo.
  * @returns {string|null}
  */
 export function extractImageUrl() {
+  const MIN_IMAGE_SIZE = 200; // Skip icons, avatars, and thumbnails
   const selectors = getAllSelectors(IMAGE_SELECTORS);
 
   for (const selector of selectors) {
     try {
-      const el = document.querySelector(selector);
-      if (el && el.src) {
-        return el.src;
+      const elements = document.querySelectorAll(selector);
+      let bestCandidate = null;
+      let bestSize = 0;
+
+      for (const el of elements) {
+        if (!el.src) continue;
+
+        // Use naturalWidth/naturalHeight (actual image dimensions, not CSS)
+        const w = el.naturalWidth || el.width || 0;
+        const h = el.naturalHeight || el.height || 0;
+        const size = Math.max(w, h);
+
+        // Accept any image from tier1/tier2 selectors that meets minimum size
+        if (size >= MIN_IMAGE_SIZE && size > bestSize) {
+          bestCandidate = el.src;
+          bestSize = size;
+        }
+      }
+
+      if (bestCandidate) {
+        console.log('[FlipChecker] Found image via selector:', selector, 'size:', bestSize);
+        return bestCandidate;
       }
     } catch (e) {
       // Invalid selector, continue

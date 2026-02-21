@@ -3,7 +3,7 @@
 // DOM-agnostic — resilient to Facebook layout changes
 
 import { API_BASE_URL } from './config.js';
-import { getAuthToken } from './state.js';
+import { getAuthToken, setState } from './state.js';
 import { parsePrice } from './utils/pricing.js';
 import { extractImageUrl } from './scraper.js';
 
@@ -38,7 +38,17 @@ function captureScreenshot() {
  * @returns {Promise<object|null>} - Extracted data or null if failed
  */
 export async function extractWithVision() {
-  const authToken = getAuthToken();
+  let authToken = getAuthToken();
+
+  // Fallback: if in-memory state has no token, try reading storage directly
+  if (!authToken) {
+    const result = await new Promise(r => chrome.storage.local.get(['authToken'], r));
+    authToken = result?.authToken || null;
+    if (authToken) {
+      setState({ authToken });
+      console.log('[FlipChecker] Vision: recovered auth token from storage');
+    }
+  }
 
   if (!authToken) {
     console.log('[FlipChecker] Vision extraction skipped - not logged in');

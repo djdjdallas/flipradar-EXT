@@ -1,6 +1,6 @@
 // FlipChecker — Popup Script (Neo-Brutalism UI)
 
-const API_BASE_URL = 'https://flipchecker.io';
+const API_BASE_URL = 'https://www.flipchecker.io';
 const EBAY_FEE_MULTIPLIER = 0.87; // 13% eBay + PayPal fees
 
 // ── DOM refs ──
@@ -202,8 +202,30 @@ async function handleSaveDeal() {
   els.btnSave.textContent = 'SAVING...';
   els.btnSave.disabled = true;
 
+  // Request listing image from content script
+  let imageUrl = null;
+  if (tab?.id) {
+    try {
+      imageUrl = await new Promise((resolve) => {
+        chrome.tabs.sendMessage(tab.id, { type: 'getListingImage' }, (res) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(res?.imageUrl || null);
+        });
+      });
+    } catch (e) {
+      // Content script may not be loaded — proceed without image
+    }
+  }
+
+  // Extract item ID from URL
+  const itemIdMatch = sourceUrl.match(/\/marketplace\/item\/(\d+)/);
+  const itemId = itemIdMatch ? itemIdMatch[1] : null;
+
   if (authToken) {
-    // Save via API through background proxy
+    // Save via API using new extension format (camelCase)
     chrome.runtime.sendMessage({
       type: 'apiRequest',
       url: `${API_BASE_URL}/api/deals`,
@@ -213,9 +235,12 @@ async function handleSaveDeal() {
         'Authorization': `Bearer ${authToken}`
       },
       body: {
-        source_url: sourceUrl,
-        user_title: currentTitle,
-        user_asking_price: currentPrice || 0,
+        url: sourceUrl,
+        title: currentTitle,
+        price: currentPrice || 0,
+        itemId: itemId,
+        extractionMethod: 'dom',
+        images: imageUrl ? [imageUrl] : null,
         ebay_search_url: ebayUrl || ''
       }
     }, (response) => {

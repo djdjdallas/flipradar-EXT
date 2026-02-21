@@ -90,6 +90,9 @@ export const SELLER_SELECTORS = {
 
 /**
  * Image selectors - Extract product images
+ * Note: Facebook removed data-testid attrs from images.
+ * Tier 2 targets the photo carousel/viewer area used on listing pages.
+ * Tier 3 is a broad scontent fallback filtered by size in extractImageUrl().
  */
 export const IMAGE_SELECTORS = {
   tier1: [
@@ -98,11 +101,18 @@ export const IMAGE_SELECTORS = {
   ],
 
   tier2: [
-    'div[role="main"] img[src*="scontent"]',
-    'img[src*="scontent"]'
+    // FB wraps listing photos in an img with object-fit inside the main content area
+    'div[role="main"] img[style*="object-fit"]',
+    // Photo viewer / carousel container images
+    'div[role="main"] div[aria-label] img[src*="scontent"]',
+    'div[role="main"] div[data-pagelet] img[src*="scontent"]'
   ],
 
-  tier3: []
+  tier3: [
+    // Broad fallback — filtered by naturalWidth in extractImageUrl()
+    'div[role="main"] img[src*="scontent"]',
+    'img[src*="scontent"]'
+  ]
 };
 
 /**

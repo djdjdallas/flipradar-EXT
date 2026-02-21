@@ -66,6 +66,9 @@ export function getEbayUrl(title) {
  * @returns {{ low: number, high: number }}
  */
 export function calculateProfit(askingPrice, ebayLow, ebayHigh, feeMultiplier = EBAY_FEE_MULTIPLIER) {
+  if (ebayLow == null || ebayHigh == null || askingPrice == null) {
+    return { low: null, high: null };
+  }
   return {
     low: Math.round((ebayLow * feeMultiplier) - askingPrice),
     high: Math.round((ebayHigh * feeMultiplier) - askingPrice)
