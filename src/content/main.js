@@ -129,6 +129,7 @@ async function initOverlay() {
   const jobId = startNewJob();
   const currentPageUrl = window.location.href;
   const itemId = getItemId();
+  setLastExtractedData(null);
 
   console.log('[FlipChecker] initOverlay started, job:', jobId, 'item:', itemId);
 

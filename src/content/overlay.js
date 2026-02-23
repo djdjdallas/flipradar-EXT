@@ -8,7 +8,7 @@ import { escapeHtml, sanitizeUrl } from './utils/dom.js';
 import { isSuspiciousListing } from './utils/filters.js';
 import { saveDealToApi, getStoredSoldData } from './api.js';
 import { isLoggedIn, openLogin, openUpgrade } from './auth.js';
-import { getItemId } from './scraper.js';
+import { getItemId, extractImageUrl } from './scraper.js';
 
 /**
  * Get the overlay styles (embedded in Shadow DOM)
@@ -417,8 +417,9 @@ export async function createOverlay(data, priceData = null, alertMatches = []) {
   const ebayUrl = priceData?.ebay_url || getEbayUrl(data.title);
   const tierBadge = getTierBadge();
 
-  // Resolve image URL from various extraction sources
-  const imageUrl = data.imageUrl || (data.images && data.images[0]) || null;
+  // Prefer GraphQL image (keyed by itemId), then data.imageUrl, then DOM fallback
+  const graphqlImage = data.images && data.images[0];
+  const imageUrl = graphqlImage || data.imageUrl || extractImageUrl() || null;
 
   // Build HTML
   let html = `

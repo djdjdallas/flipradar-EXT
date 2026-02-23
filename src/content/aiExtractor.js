@@ -6,7 +6,6 @@ import { API_BASE_URL, PAGE_TEXT_MAX_LENGTH } from './config.js';
 import { getAuthToken } from './state.js';
 import { getPageText } from './utils/dom.js';
 import { parsePrice } from './utils/pricing.js';
-import { extractImageUrl } from './scraper.js';
 
 /**
  * Extract listing data using the backend AI service
@@ -79,7 +78,7 @@ export function transformAIData(aiData, itemId) {
     location: aiData.location || null,
     seller: aiData.seller || null,
     daysListed: aiData.daysListed || null,
-    imageUrl: extractImageUrl(), // AI doesn't extract images, get from DOM
+    imageUrl: null, // Resolved later in createOverlay() with correct priority
     itemId: itemId,
     source: 'ai'
   };

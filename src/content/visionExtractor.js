@@ -5,7 +5,6 @@
 import { API_BASE_URL } from './config.js';
 import { getAuthToken, setState } from './state.js';
 import { parsePrice } from './utils/pricing.js';
-import { extractImageUrl } from './scraper.js';
 
 /**
  * Capture a screenshot of the visible tab via the service worker
@@ -120,7 +119,7 @@ export function transformVisionData(visionData, itemId) {
     location: visionData.location || null,
     seller: visionData.seller || null,
     daysListed: visionData.daysListed || null,
-    imageUrl: extractImageUrl(), // Vision doesn't extract images, get from DOM
+    imageUrl: null, // Resolved later in createOverlay() with correct priority
     itemId: itemId,
     source: 'vision'
   };
