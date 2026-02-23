@@ -112,7 +112,11 @@ function parseGraphQLResponse(response) {
  * @param {object} data
  */
 function handleInterceptedData(itemId, data) {
-  console.log('[FlipChecker] Intercepted GraphQL data for item:', itemId);
+  console.log('[FlipChecker] Intercepted GraphQL data for item:', itemId, {
+    title: data.title,
+    images: data.images?.length || 0,
+    firstImage: data.images?.[0]?.substring(0, 80) || null
+  });
   interceptedData.set(itemId, data);
 
   dataCallbacks.forEach(cb => {

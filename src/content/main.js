@@ -103,7 +103,7 @@ async function extractData(jobId, itemId) {
 
     // Wait for content to be ready (pass jobId for self-cancellation)
     const previousTitle = getLastExtractedData()?.title || null;
-    await waitForNewContent(previousTitle, itemId, undefined, jobId);
+    const waitResult = await waitForNewContent(previousTitle, itemId, undefined, jobId);
 
     // Check job still current after waiting
     if (!isJobCurrent(jobId)) {
@@ -111,9 +111,32 @@ async function extractData(jobId, itemId) {
       return null;
     }
 
-    data = extractAllData(itemId);
-    method = 'dom';
-    console.log('[FlipChecker] DOM extraction result:', data.title);
+    if (waitResult === 'timeout') {
+      // DOM never settled — use document.title for title and try to parse price from it.
+      // Don't scrape stale DOM elements for price/image.
+      const title = document.title
+        .replace(/\s*[\|\-]\s*(Facebook|Marketplace).*$/i, '')
+        .replace(/\s*[-–]\s*\$[\d,]+.*$/, '')
+        .trim();
+      const priceMatch = document.title.match(/\$[\d,]+/);
+      const price = priceMatch ? parseFloat(priceMatch[0].replace(/[$,]/g, '')) : null;
+      data = {
+        title: title || null,
+        price: price,
+        location: null,
+        seller: null,
+        daysListed: null,
+        imageUrl: null, // Don't use stale DOM image
+        itemId: itemId,
+        source: 'document_title'
+      };
+      method = 'document_title';
+      console.log('[FlipChecker] DOM timed out, using document.title only:', data.title, 'price:', data.price);
+    } else {
+      data = extractAllData(itemId);
+      method = 'dom';
+      console.log('[FlipChecker] DOM extraction result:', data.title);
+    }
   }
 
   console.log('[FlipChecker] Extraction complete (method:', method + '):', data?.title);
@@ -163,7 +186,14 @@ async function initOverlay() {
   // Store for next comparison on navigation
   setLastExtractedData(data);
 
-  console.log('[FlipChecker] Final data (method: ' + method + '):', data);
+  console.log('[FlipChecker] Final data (method: ' + method + '):', {
+    title: data.title,
+    price: data.price,
+    itemId: data.itemId,
+    imageUrl: data.imageUrl?.substring(0, 80) || null,
+    images: data.images?.map(u => u?.substring(0, 80)) || [],
+    source: data.source
+  });
 
   // Check if we got usable data
   if (!data.title && !data.price) {

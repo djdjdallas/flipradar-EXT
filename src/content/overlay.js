@@ -419,7 +419,17 @@ export async function createOverlay(data, priceData = null, alertMatches = []) {
 
   // Prefer GraphQL image (keyed by itemId), then data.imageUrl, then DOM fallback
   const graphqlImage = data.images && data.images[0];
-  const imageUrl = graphqlImage || data.imageUrl || extractImageUrl() || null;
+  const domImage = extractImageUrl();
+  const imageUrl = graphqlImage || data.imageUrl || domImage || null;
+  console.log('[FlipChecker] Image resolution:', {
+    chosen: imageUrl?.substring(0, 80),
+    graphqlImage: graphqlImage?.substring(0, 80) || null,
+    dataImageUrl: data.imageUrl?.substring(0, 80) || null,
+    domImage: domImage?.substring(0, 80) || null,
+    allImages: data.images?.length || 0,
+    source: graphqlImage ? 'graphql' : data.imageUrl ? 'data.imageUrl' : domImage ? 'dom' : 'none',
+    itemId: data.itemId
+  });
 
   // Build HTML
   let html = `

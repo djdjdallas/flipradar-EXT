@@ -78,24 +78,33 @@ export function waitForNewContent(previousTitle, currentItemId, timeout = CONTEN
       const elapsed = Date.now() - startTime;
       const isGeneric = isGenericTitle(currentTitle);
 
-      // Content changed to a real title (different from previous)
-      if (currentTitle && !isGeneric && currentTitle !== previousTitle && elapsed >= MIN_WAIT_MS) {
-        console.log('[FlipChecker] Content changed, new title:', currentTitle);
-        resolve(true);
-        return;
-      }
+      // Check if document.title has changed
+      const titleReady = currentTitle && !isGeneric && currentTitle !== previousTitle && elapsed >= MIN_WAIT_MS;
+      const firstLoad = !previousTitle && currentTitle && !isGeneric && elapsed >= MIN_WAIT_MS;
 
-      // First load - wait for any real title after minimum wait
-      if (!previousTitle && currentTitle && !isGeneric && elapsed >= MIN_WAIT_MS) {
-        console.log('[FlipChecker] First load, found title:', currentTitle);
-        resolve(true);
-        return;
+      if (titleReady || firstLoad) {
+        // Also verify the actual DOM has re-rendered (not just document.title).
+        // Facebook updates document.title before re-rendering DOM elements,
+        // so we check that a DOM heading matches the new document.title content.
+        const domTitle = getDomRenderedTitle();
+        // DOM is settled when the rendered heading matches the new item's title
+        // (from document.title), not just when it differs from the old one.
+        const domMatchesNew = domTitle && titlesMatch(currentTitle, domTitle);
+
+        if (domMatchesNew) {
+          console.log('[FlipChecker] Content changed, new title:', currentTitle, 'DOM title:', domTitle);
+          resolve(true);
+          return;
+        }
+
+        // DOM hasn't caught up yet — keep polling (unless timeout)
+        console.log('[FlipChecker] document.title updated but DOM not settled yet. docTitle:', currentTitle, 'domTitle:', domTitle);
       }
 
       // Timeout reached
       if (elapsed > timeout) {
         console.log('[FlipChecker] Timeout waiting for content change, current title:', currentTitle);
-        resolve(false);
+        resolve('timeout');
         return;
       }
 
@@ -105,6 +114,64 @@ export function waitForNewContent(previousTitle, currentItemId, timeout = CONTEN
 
     check();
   });
+}
+
+/**
+ * Get the title as rendered in the actual DOM (not document.title).
+ * Used to verify the DOM has re-rendered after SPA navigation.
+ * @returns {string|null}
+ */
+function getDomRenderedTitle() {
+  // Check h1 elements
+  const headings = document.querySelectorAll('h1, [role="heading"][aria-level="1"]');
+  for (const h of headings) {
+    const text = h.textContent.trim();
+    if (text.length > 10 && text.length < 200 &&
+        !text.startsWith('$') && !/^\d+$/.test(text) &&
+        !isGenericTitle(text)) {
+      return text;
+    }
+  }
+
+  // Check prominent spans in main content
+  const mainContent = getMainContent();
+  if (mainContent) {
+    const spans = mainContent.querySelectorAll('span[dir="auto"]');
+    for (const span of spans) {
+      const text = span.textContent.trim();
+      const fontSize = getFontSize(span);
+      if (text.length > 10 && text.length < 200 && fontSize >= 20 &&
+          !text.startsWith('$') && !/^\d+$/.test(text) &&
+          !isGenericTitle(text)) {
+        return text;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Check if two titles refer to the same item.
+ * Handles the prefix difference: document.title may include "Marketplace - " prefix
+ * while DOM headings may not, and vice versa.
+ * @param {string} a - First title
+ * @param {string} b - Second title
+ * @returns {boolean}
+ */
+function titlesMatch(a, b) {
+  if (!a || !b) return false;
+  // Strip "Marketplace - " prefix from both
+  const cleanA = a.replace(/^Marketplace\s*[-–]\s*/i, '').trim().toLowerCase();
+  const cleanB = b.replace(/^Marketplace\s*[-–]\s*/i, '').trim().toLowerCase();
+  // Exact match after cleaning
+  if (cleanA === cleanB) return true;
+  // One contains the other (handles truncation)
+  if (cleanA.includes(cleanB) || cleanB.includes(cleanA)) return true;
+  // Check first N significant characters match (FB can truncate differently)
+  const minLen = Math.min(cleanA.length, cleanB.length, 30);
+  if (minLen >= 15 && cleanA.substring(0, minLen) === cleanB.substring(0, minLen)) return true;
+  return false;
 }
 
 /**
